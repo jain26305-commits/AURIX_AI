@@ -91,7 +91,7 @@ class ForecastingService:
             sku_intelligence[str(sku_id)] = contract.model_dump()
 
         return {
-            "provenance": {"phase1_run_id": "RUN-SERVICE"},
+            "provenance": {"phase1_run_id": "RUN-SERVICE", "tenant_id": self.tenant_id},
             "sku_intelligence": sku_intelligence,
         }
 
@@ -104,7 +104,11 @@ class ForecastingService:
         else:
             portfolio = input_data
 
-        orchestrator = Phase3Orchestrator(portfolio, horizon=config.get("horizon", 14))
+        orchestrator = Phase3Orchestrator(
+            portfolio,
+            horizon=config.get("horizon", 14),
+            tenant_id=self.tenant_id,
+        )
         res = orchestrator.execute()
         return res if isinstance(res, dict) else {}
 

@@ -1,7 +1,7 @@
 """Database models for tracking the lifecycle of data ingestion runs."""
 
 from datetime import datetime
-from sqlalchemy import Column, String, Integer, DateTime
+from sqlalchemy import Column, String, Integer, DateTime, Text
 from aurix_core.database.engine import Base
 from aurix_core.database.models.base import TenantMixin
 
@@ -26,3 +26,16 @@ class IngestionRun(Base, TenantMixin):
 
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     completed_at = Column(DateTime, nullable=True)
+
+
+class OnboardingQuarantineRecord(Base, TenantMixin):
+    """Tenant-scoped immutable record of onboarding rows rejected by validation."""
+
+    __tablename__ = "onboarding_quarantine"
+
+    id = Column(String(64), primary_key=True, index=True)
+    run_id = Column(String(64), nullable=False, index=True)
+    row_hash = Column(String(128), nullable=False, index=True)
+    reason = Column(Text, nullable=False)
+    payload_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

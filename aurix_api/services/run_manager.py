@@ -18,6 +18,7 @@ from aurix_api.schemas.runs import (
     RunSummaryItem,
 )
 from aurix_core.database.engine import SessionLocal
+from aurix_core.database.tenant_context import tenant_scope
 from aurix_core.database.models.intelligence import IntelligenceRunModel
 from aurix_core.database.repositories.intelligence import IntelligenceRunRepository
 from aurix_core.intelligence.service import IntelligenceService
@@ -44,31 +45,32 @@ class RunManager:
         config: Dict[str, Any],
     ) -> None:
         """Background worker function executing autonomous intelligence within a dedicated session."""
-        db: Session = SessionLocal()
-        try:
-            service = IntelligenceService(db, tenant_id)
-            logger.info("Background run worker started for Run ID: %s [Tenant: %s]", run_id, tenant_id)
-
-            result = service.run_autonomous_intelligence(
-                canonical_datasets=canonical_datasets,
-                incremental_update=incremental_update,
-                config=config,
-            )
-            logger.info("Background run worker completed for Run ID: %s with status: %s", run_id, result.get("status"))
-        except Exception as e:
-            db.rollback()
-            logger.error("Background run worker failed for Run ID %s: %s", run_id, str(e), exc_info=True)
+        with tenant_scope(tenant_id):
+            db: Session = SessionLocal()
             try:
-                run_repo = IntelligenceRunRepository(db, tenant_id)
-                run_rec = run_repo.get_by_id(run_id)
-                if run_rec:
-                    setattr(run_rec, "status", "FAILED")
-                    setattr(run_rec, "provenance", json.dumps({"error": str(e)}, default=str))
-                    db.commit()
-            except Exception:
-                pass
-        finally:
-            db.close()
+                service = IntelligenceService(db, tenant_id)
+                logger.info("Background run worker started for Run ID: %s [Tenant: %s]", run_id, tenant_id)
+
+                result = service.run_autonomous_intelligence(
+                    canonical_datasets=canonical_datasets,
+                    incremental_update=incremental_update,
+                    config=config,
+                )
+                logger.info("Background run worker completed for Run ID: %s with status: %s", run_id, result.get("status"))
+            except Exception as e:
+                db.rollback()
+                logger.error("Background run worker failed for Run ID %s: %s", run_id, str(e), exc_info=True)
+                try:
+                    run_repo = IntelligenceRunRepository(db, tenant_id)
+                    run_rec = run_repo.get_by_id(run_id)
+                    if run_rec:
+                        setattr(run_rec, "status", "FAILED")
+                        setattr(run_rec, "provenance", json.dumps({"error": str(e)}, default=str))
+                        db.commit()
+                except Exception:
+                    pass
+            finally:
+                db.close()
 
     @classmethod
     def submit_run(

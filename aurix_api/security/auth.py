@@ -7,6 +7,7 @@ import json
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from collections.abc import AsyncGenerator
 from typing import Any, Dict, List, Optional
 from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
@@ -19,6 +20,10 @@ from aurix_api.schemas.auth import (
     UserIdentity,
 )
 from aurix_core.config.settings import settings
+from aurix_core.database.tenant_context import (
+    reset_current_tenant_id,
+    set_current_tenant_id,
+)
 
 # Security Scheme Dependencies
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -141,7 +146,7 @@ async def get_current_tenant_context(
     request: Request,
     bearer_auth: Optional[HTTPAuthorizationCredentials] = Depends(bearer_scheme),
     api_key_auth: Optional[str] = Security(api_key_header_scheme),
-) -> TenantContext:
+) -> AsyncGenerator[TenantContext, None]:
     """
     FastAPI security dependency resolving and injecting the authenticated TenantContext.
     Enforces strict tenant isolation by mapping verified claims to context.
@@ -195,8 +200,12 @@ async def get_current_tenant_context(
         created_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    # Mount resolved tenant context to request state for logging and analytics
+    # Mount resolved tenant context to request state for logging and analytics.
     request.state.tenant_context = tenant_context
     request.state.tenant_id = tenant_context.tenant_id
+    tenant_token = set_current_tenant_id(tenant_context.tenant_id)
 
-    return tenant_context
+    try:
+        yield tenant_context
+    finally:
+        reset_current_tenant_id(tenant_token)

@@ -74,6 +74,34 @@ class DataParser:
         return cls._clean_dataframe(df)
 
     @classmethod
+    def parse_xlsx_workbook(
+        cls,
+        content: bytes,
+    ) -> List[Tuple[str, List[Dict[str, Any]], List[str]]]:
+        """Parse every worksheet independently without silently dropping sheets."""
+        try:
+            engine: Literal["xlrd", "openpyxl"] = (
+                "xlrd" if content.startswith(XLS_LEGACY_MAGIC_BYTES) else "openpyxl"
+            )
+            excel_io = io.BytesIO(content)
+            workbook = pd.ExcelFile(excel_io, engine=engine)
+            results: List[Tuple[str, List[Dict[str, Any]], List[str]]] = []
+            for sheet_name in workbook.sheet_names:
+                frame = pd.read_excel(
+                    workbook,
+                    sheet_name=sheet_name,
+                    engine=engine,
+                    dtype=object,
+                )
+                records, columns = cls._clean_dataframe(frame)
+                results.append((str(sheet_name), records, columns))
+            return results
+        except Exception as e:
+            raise FileSafetyException(
+                f"Failed to inspect Excel workbook sheets: {str(e)}"
+            )
+
+    @classmethod
     def parse_xlsx(
         cls,
         content: bytes,

@@ -210,6 +210,40 @@ async def execute_action(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Action '{action_id}' not found.")
 
 
+@router.post(
+    "/actions/{action_id}/reconcile",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Reconcile Unknown External Action",
+    description="Reconciles an externally submitted action without resubmitting the external write.",
+)
+async def reconcile_action(
+    action_id: str,
+    tenant_context: TenantContext = Depends(get_current_tenant_context),
+    _: TenantContext = Depends(require_permission(Permission.EXECUTE_ACTION)),
+    __: TenantContext = Depends(rate_limit_standard()),
+    db: Session = Depends(get_db),
+) -> ApiResponse[Dict[str, Any]]:
+    """Queries the external boundary for an unknown outcome and never blindly re-executes it."""
+    tenant_id = tenant_context.tenant_id
+    actor_id = tenant_context.user_id
+    actor_roles = [r.value for r in tenant_context.roles]
+
+    try:
+        res = ActionExecutor.reconcile_action(
+            db, tenant_id, action_id, actor_id, actor_roles
+        )
+        return ApiResponse(
+            status=ResponseStatus.SUCCESS if res.success else ResponseStatus.FAILED,
+            data=res.model_dump(),
+            meta=ResponseMetadata(tenant_id=tenant_id),
+        )
+    except KeyError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Action '{action_id}' not found.",
+        )
+
+
 @router.get(
     "/actions/{action_id}/audit",
     response_model=ApiResponse[List[Dict[str, Any]]],

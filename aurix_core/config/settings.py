@@ -6,7 +6,7 @@ settings fail fast when security-critical values are unsafe.
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Literal
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -21,12 +21,26 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite:///./aurix_enterprise.db"
+    database_disable_prepared_statements: bool = Field(default=False)
 
     # Multi-tenancy
     default_tenant_id: str = "default_tenant"
 
+    database_pool_size: int = Field(default=5)
+    database_max_overflow: int = Field(default=10)
+    database_pool_timeout_seconds: int = Field(default=30)
+    database_pool_recycle_seconds: int = Field(default=1800)
+    database_connect_timeout_seconds: int = Field(default=10)
+    database_statement_timeout_ms: int = Field(default=30000)
+
     # Artifact storage
     artifact_storage_path: str = "./artifacts"
+    artifact_storage_backend: Literal["local", "supabase"] = "local"
+    artifact_storage_bucket: str = "aurix-artifacts"
+    artifact_storage_prefix: str = "models"
+    artifact_storage_timeout_seconds: int = 30
+    supabase_url: str = ""
+    supabase_service_role_key: str = ""
 
     # Runtime build identity
     build_version: str = Field(default="15.1.0")
@@ -148,6 +162,12 @@ class Settings(BaseSettings):
 
         positive_ints = {
             "api_access_token_expire_minutes": self.api_access_token_expire_minutes,
+            "database_pool_size": self.database_pool_size,
+            "database_max_overflow": self.database_max_overflow,
+            "database_pool_timeout_seconds": self.database_pool_timeout_seconds,
+            "database_pool_recycle_seconds": self.database_pool_recycle_seconds,
+            "database_connect_timeout_seconds": self.database_connect_timeout_seconds,
+            "database_statement_timeout_ms": self.database_statement_timeout_ms,
             "rate_limit_requests_per_minute": self.rate_limit_requests_per_minute,
             "rate_limit_ai_requests_per_minute": self.rate_limit_ai_requests_per_minute,
             "ai_monthly_token_limit": self.ai_monthly_token_limit,
@@ -156,6 +176,7 @@ class Settings(BaseSettings):
             "ai_daily_request_limit": self.ai_daily_request_limit,
             "max_upload_file_size_bytes": self.max_upload_file_size_bytes,
             "max_onboarding_records_sync": self.max_onboarding_records_sync,
+            "artifact_storage_timeout_seconds": self.artifact_storage_timeout_seconds,
             "connector_default_timeout_seconds": self.connector_default_timeout_seconds,
             "connector_max_retry_attempts": self.connector_max_retry_attempts,
             "webhook_timestamp_tolerance_seconds": self.webhook_timestamp_tolerance_seconds,
@@ -239,6 +260,23 @@ class Settings(BaseSettings):
             if self.database_url.startswith("sqlite://"):
                 raise ValueError(
                     "FATAL SECURITY VIOLATION: SQLite is not permitted for production."
+                )
+
+            if self.artifact_storage_backend != "supabase":
+                raise ValueError(
+                    "FATAL CONFIGURATION VIOLATION: production artifact storage "
+                    "must use the durable Supabase backend."
+                )
+
+            if not self.supabase_url.strip() or not self.supabase_service_role_key.strip():
+                raise ValueError(
+                    "FATAL CONFIGURATION VIOLATION: production artifact storage "
+                    "requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+                )
+
+            if not self.artifact_storage_bucket.strip():
+                raise ValueError(
+                    "FATAL CONFIGURATION VIOLATION: artifact storage bucket cannot be empty."
                 )
 
             if self.enable_docs:

@@ -106,6 +106,7 @@ class ActionContract(BaseModel):
     correlation_id: Optional[str] = Field(default=None, description="Distributed correlation trace ID")
     error_message: Optional[str] = Field(default=None, description="Error details if execution or validation failed")
     external_transaction_id: Optional[str] = Field(default=None, description="Transaction ID assigned by external system")
+    external_request_id: Optional[str] = Field(default=None, description="Idempotent request identifier sent to the external system")
     expires_at: Optional[str] = Field(default=None, description="Expiration timestamp for approval and execution")
     approval_hash: Optional[str] = Field(default=None, description="Cryptographic content hash locked at approval time to enforce immutability")
 

@@ -35,3 +35,6 @@ logs/
 # Local test uploads / generated temporary artifacts
 tests/
 docs/
+
+# Local model/artifact outputs; production uses durable object storage
+artifacts/

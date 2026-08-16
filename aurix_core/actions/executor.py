@@ -74,13 +74,12 @@ class ActionExecutor:
         correlation_id: Optional[str] = None,
     ) -> ActionContract:
         """Creates a new operational action contract in CREATED state with idempotency key generation."""
+        action_id = f"ACT-{uuid.uuid4().hex[:8].upper()}"
         idempotency_hash = uuid.uuid5(
             uuid.NAMESPACE_DNS,
-            f"{tenant_id}:{action_type.value}:{entity_id}:{datetime.now(timezone.utc).date()}"
+            f"{tenant_id}:{action_id}",
         ).hex
-        idempotency_key = f"IDEM-{idempotency_hash[:12]}"
-
-        action_id = f"ACT-{uuid.uuid4().hex[:8].upper()}"
+        idempotency_key = f"IDEM-{idempotency_hash[:20]}"
         action = ActionContract(
             action_id=action_id,
             tenant_id=tenant_id,
@@ -287,6 +286,7 @@ class ActionExecutor:
 
         action.actual_result = exec_res.response_payload
         action.external_transaction_id = exec_res.external_transaction_id
+        action.external_request_id = exec_res.external_request_id or action.idempotency_key
 
         if exec_res.transmission_state == "EXTERNAL_UNKNOWN" or not exec_res.success:
             target_state = ActionState.EXTERNAL_UNKNOWN if exec_res.transmission_state == "EXTERNAL_UNKNOWN" else ActionState.COMPENSATION_REQUIRED
@@ -433,6 +433,72 @@ class ActionExecutor:
                     exec_res.external_transaction_id
                 ),
             )
+
+    @classmethod
+    def reconcile_action(
+        cls,
+        db: Session,
+        tenant_id: str,
+        action_id: str,
+        actor_id: str,
+        actor_roles: List[str],
+    ) -> ActionExecutionResult:
+        """Reconcile an externally submitted action without resubmitting it."""
+        action = cls._get_action_or_raise(tenant_id, action_id)
+        if action.execution_state != ActionState.EXTERNAL_UNKNOWN:
+            return ActionExecutionResult(
+                action_id=action_id,
+                tenant_id=tenant_id,
+                execution_state=action.execution_state,
+                approval_state=action.approval_state,
+                success=action.execution_state in {ActionState.VERIFIED, ActionState.EXECUTED},
+                message="No reconciliation was required because the action is not in EXTERNAL_UNKNOWN state.",
+                external_transaction_id=action.external_transaction_id,
+            )
+
+        exec_res = ActionExecutionAdapter.reconcile_action(tenant_id, action)
+        action.actual_result = exec_res.response_payload
+        action.external_transaction_id = exec_res.external_transaction_id or action.external_transaction_id
+        action.external_request_id = exec_res.external_request_id or action.idempotency_key
+
+        if exec_res.transmission_state == "VERIFIED" and exec_res.success:
+            cls._transition_state(
+                tenant_id,
+                action,
+                ActionState.VERIFIED,
+                actor_id,
+                actor_roles,
+                {"reconciled": True, "tx_id": action.external_transaction_id},
+            )
+            cls._emit_phase13_event(db, tenant_id, action, EventTaxonomy.INVENTORY_UPDATED, "ACTION_RECONCILED")
+            return ActionExecutionResult(
+                action_id=action_id,
+                tenant_id=tenant_id,
+                execution_state=ActionState.VERIFIED,
+                approval_state=action.approval_state,
+                success=True,
+                message="External action reconciled successfully without resubmission.",
+                external_transaction_id=action.external_transaction_id,
+            )
+
+        cls._transition_state(
+            tenant_id,
+            action,
+            ActionState.MANUAL_INTERVENTION_REQUIRED,
+            actor_id,
+            actor_roles,
+            {"reconciled": False, "error": exec_res.error_message},
+        )
+        action.error_message = exec_res.error_message
+        return ActionExecutionResult(
+            action_id=action_id,
+            tenant_id=tenant_id,
+            execution_state=ActionState.MANUAL_INTERVENTION_REQUIRED,
+            approval_state=action.approval_state,
+            success=False,
+            message="External state could not be reconciled. Manual intervention is required; no resubmission was performed.",
+            error_message=exec_res.error_message,
+        )
 
     @classmethod
     def _get_action_or_raise(cls, tenant_id: str, action_id: str) -> ActionContract:

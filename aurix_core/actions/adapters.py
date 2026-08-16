@@ -16,6 +16,7 @@ class ExternalExecutionResult(BaseModel):
 
     success: bool = False
     external_transaction_id: Optional[str] = None
+    external_request_id: Optional[str] = None
     external_record_id: Optional[str] = None
     status_code: str = "PENDING"
 
@@ -37,7 +38,58 @@ class ExternalExecutionResult(BaseModel):
 
 
 class ActionExecutionAdapter:
+    _IDEMPOTENCY_RESULTS: Dict[str, ExternalExecutionResult] = {}
+
     """Manages controlled execution of operational writes through Phase 12 connectors with timeout/unknown resilience."""
+
+    @classmethod
+    def reconcile_action(
+        cls,
+        tenant_id: str,
+        action: ActionContract,
+    ) -> ExternalExecutionResult:
+        """Return the previously observed external outcome for an idempotent request."""
+        key = f"{tenant_id}:{action.idempotency_key}"
+        result = cls._IDEMPOTENCY_RESULTS.get(key)
+        if result is None:
+            return ExternalExecutionResult(
+                success=False,
+                external_request_id=action.idempotency_key,
+                status_code="NOT_FOUND",
+                transmission_state="EXTERNAL_UNKNOWN",
+                error_message="External outcome could not be reconciled for the idempotency key.",
+            )
+        return result.model_copy(deep=True)
+
+    @classmethod
+    def _reconciled_success_result(
+        cls,
+        tenant_id: str,
+        action: ActionContract,
+    ) -> ExternalExecutionResult:
+        """Controlled execution-double outcome used to test timeout reconciliation."""
+        tx_id = (
+            f"TX-RECON-"
+            f"{uuid.uuid5(uuid.NAMESPACE_DNS, f'{tenant_id}:{action.idempotency_key}').hex[:12].upper()}"
+        )
+        return ExternalExecutionResult(
+            success=True,
+            external_request_id=action.idempotency_key,
+            external_transaction_id=tx_id,
+            external_record_id=(
+                f"REC-{uuid.uuid5(uuid.NAMESPACE_DNS, action.action_id).hex[:10].upper()}"
+            ),
+            status_code="VERIFIED_200",
+            transmission_state="VERIFIED",
+            response_payload={
+                "idempotency_key": action.idempotency_key,
+                "verification": {
+                    "status": "VERIFIED",
+                    "verification_source": "CONTROLLED_EXECUTION_DOUBLE_RECONCILIATION",
+                    "transaction_id": tx_id,
+                },
+            },
+        )
 
     @classmethod
     def execute_action(
@@ -66,9 +118,16 @@ class ActionExecutionAdapter:
         # ---------------------------------------------------------
         # 1. Simulated network timeout / unknown outcome
         # ---------------------------------------------------------
+        key = f"{tenant_id}:{action.idempotency_key}"
+        prior_result = cls._IDEMPOTENCY_RESULTS.get(key)
+        if prior_result is not None:
+            return prior_result.model_copy(deep=True)
+
         if action.payload.get("simulate_timeout", False):
+            cls._IDEMPOTENCY_RESULTS[key] = cls._reconciled_success_result(tenant_id, action)
             return ExternalExecutionResult(
                 success=False,
+                external_request_id=action.idempotency_key,
                 status_code="TIMEOUT_504",
                 transmission_state="EXTERNAL_UNKNOWN",
                 error_message=(
@@ -209,8 +268,9 @@ class ActionExecutionAdapter:
             tx_id,
         )
 
-        return ExternalExecutionResult(
+        result = ExternalExecutionResult(
             success=True,
+            external_request_id=action.idempotency_key,
             external_transaction_id=tx_id,
             external_record_id=rec_id,
             status_code="VERIFIED_200",
@@ -224,6 +284,8 @@ class ActionExecutionAdapter:
                 },
             },
         )
+        cls._IDEMPOTENCY_RESULTS[f"{tenant_id}:{action.idempotency_key}"] = result.model_copy(deep=True)
+        return result
 
     @classmethod
     def _execute_replenishment(
@@ -281,8 +343,9 @@ class ActionExecutionAdapter:
             tx_id,
         )
 
-        return ExternalExecutionResult(
+        result = ExternalExecutionResult(
             success=True,
+            external_request_id=action.idempotency_key,
             external_transaction_id=tx_id,
             external_record_id=rec_id,
             status_code="VERIFIED_200",
@@ -296,3 +359,5 @@ class ActionExecutionAdapter:
                 },
             },
         )
+        cls._IDEMPOTENCY_RESULTS[f"{tenant_id}:{action.idempotency_key}"] = result.model_copy(deep=True)
+        return result

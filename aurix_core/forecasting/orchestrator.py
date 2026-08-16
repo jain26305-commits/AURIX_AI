@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import datetime
+import io
 import joblib  # type: ignore
 import pandas as pd
 from typing import Dict, Any, cast
@@ -13,17 +14,24 @@ from aurix_core.forecasting.competition import ModelCompetitionEngine
 from aurix_core.forecasting.champion import ChampionSelector
 from aurix_core.forecasting.generator import FinalForecastGenerator
 from aurix_core.utils.provenance import compute_sha256
+from aurix_core.mlops.artifact_storage import ArtifactStorage
+from aurix_core.config.settings import settings
 
 
 class Phase3Orchestrator:
     """Master controller for Phase 3 Forecasting, Model Competition, and Champion Selection."""
 
     def __init__(
-        self, phase2_portfolio_output: Dict[str, Any], horizon: int = 2, artifacts_dir: str = "artifacts/models"
+        self,
+        phase2_portfolio_output: Dict[str, Any],
+        horizon: int = 2,
+        artifacts_dir: str = "artifacts/models",
+        tenant_id: str | None = None,
     ) -> None:
         self.phase2_data = phase2_portfolio_output
         self.horizon = horizon
         self.artifacts_dir = artifacts_dir
+        self.tenant_id = tenant_id
         self.run_id = str(uuid.uuid4())
         self.timestamp = datetime.datetime.now().isoformat()
         os.makedirs(self.artifacts_dir, exist_ok=True)
@@ -182,7 +190,7 @@ class Phase3Orchestrator:
             key = "forecast_available" if status == ForecastStatus.AVAILABLE else "forecast_limited"
             portfolio_summary_stats[key] = int(portfolio_summary_stats[key]) + 1
 
-            # SKU Artifact Directory Creation
+            # Artifact storage is local for development/tests and durable Supabase Storage in production.
             sku_artifact_dir = os.path.join(self.artifacts_dir, sku)
             os.makedirs(sku_artifact_dir, exist_ok=True)
 
@@ -190,8 +198,27 @@ class Phase3Orchestrator:
             metadata_path = os.path.join(sku_artifact_dir, "metadata.json")
 
             # Binary Champion Model Serialization
+            model_reference = None
+            tenant_id = str(
+                self.tenant_id
+                or provenance_meta.get("tenant_id")
+                or settings.default_tenant_id
+            )
             if champion_obj is not None:
-                joblib.dump(champion_obj, model_path)
+                if settings.artifact_storage_backend == "local":
+                    joblib.dump(champion_obj, model_path)
+                    model_reference = model_path
+                else:
+                    model_buffer = io.BytesIO()
+                    joblib.dump(champion_obj, model_buffer)
+                    model_reference = ArtifactStorage.save_bytes(
+                        tenant_id=tenant_id,
+                        model_type="DEMAND_FORECAST",
+                        version="3.1.0",
+                        filename=f"{sku}__champion.joblib",
+                        data=model_buffer.getvalue(),
+                    )
+                    model_path = model_reference
                 model_params = champion_obj.get_params()
             else:
                 model_params = {}
@@ -213,8 +240,21 @@ class Phase3Orchestrator:
                 "model_parameters": model_params,
             }
 
-            with open(metadata_path, "w", encoding="utf-8") as f:
-                json.dump(artifact_metadata, f, indent=2)
+            metadata_bytes = json.dumps(artifact_metadata, indent=2).encode("utf-8")
+            if settings.artifact_storage_backend == "local":
+                with open(metadata_path, "wb") as f:
+                    f.write(metadata_bytes)
+                metadata_reference = metadata_path
+            else:
+                metadata_reference = ArtifactStorage.save_bytes(
+                    tenant_id=tenant_id,
+                    model_type="DEMAND_FORECAST",
+                    version="3.1.0",
+                    filename=f"{sku}__metadata.json",
+                    data=metadata_bytes,
+                    content_type="application/json",
+                )
+                metadata_path = metadata_reference
 
             phase4_contract = Phase4InputContract(
                 entity_id=sku,
@@ -236,9 +276,11 @@ class Phase3Orchestrator:
                     "phase3_version": "3.1.0",
                     "model_version": "3.1.0",
                     "engine_version": "3.1.0",
-                    "artifact_dir": sku_artifact_dir,
+                    "artifact_dir": sku_artifact_dir if settings.artifact_storage_backend == "local" else None,
                     "model_path": model_path,
                     "metadata_path": metadata_path,
+                    "model_storage_reference": model_reference,
+                    "metadata_storage_reference": metadata_reference,
                 },
             )
             sku_forecast_contracts[sku] = phase4_contract.model_dump()
