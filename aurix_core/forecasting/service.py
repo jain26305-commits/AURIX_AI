@@ -3,7 +3,7 @@
 import json
 import uuid
 import hashlib
-from typing import Any, Dict, List, Optional, cast
+from typing import Any, Dict, List, Optional, Iterable, Tuple
 import pandas as pd
 from sqlalchemy.orm import Session
 
@@ -63,7 +63,10 @@ class ForecastingService:
             raise ValueError("Input DataFrame missing required demand column ('demand' or 'value').")
 
         sku_intelligence: Dict[str, Any] = {}
-        grouped = df.groupby("sku_id") if "sku_id" in df.columns else [("DEFAULT_SKU", df)]
+        if "sku_id" in df.columns:
+            grouped: Iterable[Tuple[Any, pd.DataFrame]] = df.groupby("sku_id")
+        else:
+            grouped = [("DEFAULT_SKU", df)]
 
         for sku_id, group in grouped:
             obs_data = []
@@ -103,7 +106,7 @@ class ForecastingService:
 
         orchestrator = Phase3Orchestrator(portfolio, horizon=config.get("horizon", 14))
         res = orchestrator.execute()
-        return cast(Dict[str, Any], res) if not isinstance(res, dict) else res
+        return res if isinstance(res, dict) else {}
 
     def run_forecast(
         self,

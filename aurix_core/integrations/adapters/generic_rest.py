@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
 
@@ -10,7 +10,6 @@ from aurix_core.integrations.base import BaseConnector, ConnectorException
 from aurix_core.integrations.contracts import (
     ConnectorConfig,
     ConnectorHealthState,
-    IntegrationFamily,
 )
 
 logger = logging.getLogger("aurix.integrations.adapters.rest")

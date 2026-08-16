@@ -5,7 +5,7 @@ import logging
 import math
 import os
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger("aurix_core.mlops.registry")
@@ -76,7 +76,6 @@ class ModelRegistry:
     ) -> ModelArtifactRecord:
         """Registers a new model artifact with checksum generation and secure path validation."""
         # Prevent path traversal vulnerabilities
-        safe_filename = os.path.basename(artifact_path)
         if not os.path.exists(artifact_path):
             raise FileNotFoundError(f"Model artifact path '{artifact_path}' does not exist.")
 

@@ -2,7 +2,7 @@
 
 import logging
 import threading
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 logger = logging.getLogger("aurix_core.observability.metrics")
 

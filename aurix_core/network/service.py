@@ -27,6 +27,7 @@ from aurix_core.database.repositories.network import (
 from aurix_core.network.config import NetworkConfiguration
 from aurix_core.network.orchestrator import Phase7AOrchestrator
 
+
 def _json_dumps(value: Any) -> str:
     """Serialize a Python value into stable JSON for persistence."""
     return json.dumps(value, default=str, sort_keys=True)

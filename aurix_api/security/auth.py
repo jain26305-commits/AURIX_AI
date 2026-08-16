@@ -14,7 +14,6 @@ from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBea
 from aurix_api.schemas.auth import (
     Permission,
     Role,
-    ROLE_PERMISSIONS,
     TenantContext,
     TokenPayload,
     UserIdentity,

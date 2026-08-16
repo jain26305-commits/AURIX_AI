@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from aurix_core.integrations.base import BaseConnector, ConnectorException
+from aurix_core.integrations.base import BaseConnector
 from aurix_core.integrations.contracts import (
     ConnectorConfig,
     ConnectorHealthState,

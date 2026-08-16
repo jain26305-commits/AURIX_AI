@@ -12,8 +12,8 @@ from aurix_api.schemas.base import ApiResponse, ResponseMetadata, ResponseStatus
 from aurix_api.security.auth import get_current_tenant_context
 from aurix_api.security.rate_limit import rate_limit_standard
 from aurix_api.security.rbac import require_permission
-from aurix_core.actions.contracts import ActionCategory, ActionContract, ActionState, ActionType
-from aurix_core.actions.executor import ActionExecutionResult, ActionExecutor
+from aurix_core.actions.contracts import ActionCategory, ActionContract, ActionType
+from aurix_core.actions.executor import ActionExecutor
 
 logger = logging.getLogger("aurix_api.routers.actions")
 

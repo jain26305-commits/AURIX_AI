@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from .base import BaseForecaster
 
 
@@ -16,22 +16,30 @@ class CrostonForecaster(BaseForecaster):
             self.forecast_val = 0.0
             self.is_fitted = True
             return self
-        non_zero_indices = np.where(obs > 0)[0]
+        non_zero_indices = np.asarray(np.where(obs > 0)[0], dtype=np.intp)
         if len(non_zero_indices) == 0:
             self.forecast_val = 0.0
             self.is_fitted = True
             return self
-        demand_sizes = obs[non_zero_indices]
-        intervals = []
+        demand_sizes: List[float] = [
+            float(value) for value in obs[non_zero_indices]
+        ]
+        intervals: List[float] = []
         prev_idx = -1
         for idx in non_zero_indices:
             intervals.append(float(int(idx) - prev_idx))
             prev_idx = int(idx)
-        z = demand_sizes[0]
-        p = intervals[0]
+        z = float(demand_sizes[0])
+        p = float(intervals[0])
         for i in range(1, len(demand_sizes)):
-            z = self.alpha * demand_sizes[i] + (1 - self.alpha) * z
-            p = self.alpha * intervals[i] + (1 - self.alpha) * p
+            z = (
+                self.alpha * demand_sizes[i]
+                + (1 - self.alpha) * z
+            )
+            p = (
+                self.alpha * intervals[i]
+                + (1 - self.alpha) * p
+            )
         self.forecast_val = float(z / p) if p > 0 else 0.0
         self.is_fitted = True
         return self
@@ -63,22 +71,30 @@ class SBAForecaster(BaseForecaster):
             self.forecast_val = 0.0
             self.is_fitted = True
             return self
-        non_zero_indices = np.where(obs > 0)[0]
+        non_zero_indices = np.asarray(np.where(obs > 0)[0], dtype=np.intp)
         if len(non_zero_indices) == 0:
             self.forecast_val = 0.0
             self.is_fitted = True
             return self
-        demand_sizes = obs[non_zero_indices]
-        intervals = []
+        demand_sizes: List[float] = [
+            float(value) for value in obs[non_zero_indices]
+        ]
+        intervals: List[float] = []
         prev_idx = -1
         for idx in non_zero_indices:
             intervals.append(float(int(idx) - prev_idx))
             prev_idx = int(idx)
-        z = demand_sizes[0]
-        p = intervals[0]
+        z = float(demand_sizes[0])
+        p = float(intervals[0])
         for i in range(1, len(demand_sizes)):
-            z = self.alpha * demand_sizes[i] + (1 - self.alpha) * z
-            p = self.alpha * intervals[i] + (1 - self.alpha) * p
+            z = (
+                self.alpha * demand_sizes[i]
+                + (1 - self.alpha) * z
+            )
+            p = (
+                self.alpha * intervals[i]
+                + (1 - self.alpha) * p
+            )
         correction_factor = 1.0 - (self.alpha / 2.0)
         base_croston = (z / p) if p > 0 else 0.0
         self.forecast_val = float(correction_factor * base_croston)

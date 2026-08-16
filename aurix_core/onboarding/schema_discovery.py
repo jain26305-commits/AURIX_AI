@@ -14,7 +14,7 @@ from aurix_core.onboarding.contracts import (
 DATE_PATTERNS = [
     re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$"),          # 2026-08-14, 2026/08/14
     re.compile(r"^\d{1,2}[-/]\d{1,2}[-/]\d{4}$"),          # 14-08-2026, 08/14/2026
-    re.compile(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}"), # ISO Timestamp
+    re.compile(r"^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}"),  # ISO Timestamp
 ]
 CURRENCY_REGEX = re.compile(r"^[\$\€\£\¥\₹\s]*[\d,]+(\.\d+)?[\s]*[A-Z]{0,3}$")
 NUMERIC_CLEAN_REGEX = re.compile(r"[\$,\s\€\£\¥\₹]")

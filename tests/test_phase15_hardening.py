@@ -4,8 +4,6 @@ import logging
 import os
 import tempfile
 import unittest
-from datetime import datetime, timezone
-from typing import Any, Dict, List
 
 from aurix_core.database.engine import Base, SessionLocal, engine
 from aurix_core.maintenance.retention import DataRetentionEngine

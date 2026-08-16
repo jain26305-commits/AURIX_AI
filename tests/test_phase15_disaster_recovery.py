@@ -5,14 +5,11 @@ import shutil
 import sqlite3
 import tempfile
 import unittest
-from datetime import datetime, timezone
-from typing import Any, Dict
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 
 from aurix_api.runs.manager import RunManager, RunStatus
-from aurix_core.actions.contracts import ActionCategory, ActionState, ActionType
 from aurix_core.actions.executor import ActionExecutor
 from aurix_core.database.engine import Base
 from aurix_core.mlops.registry import ModelRegistry

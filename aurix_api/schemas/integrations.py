@@ -1,21 +1,13 @@
 """Pydantic request and response schemas for Integration Hub API endpoints in Phase 12."""
 
-from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
 
 from aurix_core.integrations.contracts import (
     AuthConfig,
-    ConnectorConfig,
-    ConnectorHealthState,
     IntegrationFamily,
-    IntegrationHealthReport,
     ReconciliationRecord,
-    ReconciliationStatus,
-    SourceLineageRecord,
-    SyncMode,
-    SyncRunRecord,
-    SyncStatus,
+    SyncMode
 )
 
 

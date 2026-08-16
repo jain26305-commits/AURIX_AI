@@ -8,7 +8,6 @@ from unittest.mock import MagicMock
 
 from aurix_core.actions.contracts import (
     ActionCategory,
-    ActionContract,
     ActionState,
     ActionType,
     ApprovalState,
@@ -16,8 +15,6 @@ from aurix_core.actions.contracts import (
 from aurix_core.actions.executor import ActionExecutor
 from aurix_core.config.settings import Settings
 from aurix_core.events.contracts import (
-    AlertSeverity,
-    AlertStatus,
     EventStatus,
     EventTaxonomy,
     InternalEvent,
@@ -26,7 +23,7 @@ from aurix_core.events.processor import EventProcessor
 from aurix_core.integrations.adapters.erp_odoo import OdooErpConnector
 from aurix_core.integrations.adapters.wms_generic import GenericWMSAdapter
 from aurix_core.integrations.contracts import ConnectorConfig
-from aurix_core.intelligence.ai_gateway import AIGateway, ProviderStatus
+from aurix_core.intelligence.ai_gateway import AIGateway
 from aurix_core.intelligence.context import FactItem, FactPack
 from aurix_core.intelligence.quota import AIQuotaManager, TenantAIQuotaPolicy
 from aurix_core.intelligence.router import QueryType, RouterConfidence, RoutingDecision

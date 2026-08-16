@@ -1,6 +1,6 @@
 """Domain analytics response schemas for Phase 10."""
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from pydantic import BaseModel, Field
 
 

@@ -5,12 +5,11 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
-from aurix_core.integrations.base import BaseConnector, ConnectorException
+from aurix_core.integrations.base import BaseConnector
 from aurix_core.integrations.contracts import (
     ConnectorConfig,
     ConnectorHealthState,
     IntegrationFamily,
-    SyncStatus,
 )
 
 logger = logging.getLogger("aurix_core.integrations.adapters.wms_generic")
@@ -105,7 +104,7 @@ class GenericWmsConnector(BaseConnector):
             return dt.isoformat()
         except ValueError:
             logger.warning("Date string [%s] is not valid ISO format; preserving as-is or null.", clean_val)
-            return clean_val
+            return str(clean_val)
 
     def transform_inventory_payload(
         self,

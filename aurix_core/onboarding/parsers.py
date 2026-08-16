@@ -3,7 +3,7 @@
 import csv
 import io
 import json
-from typing import Any, Dict, List, Optional, Tuple, Union, cast
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union, cast
 import pandas as pd
 
 from aurix_core.onboarding.contracts import SourceType
@@ -82,10 +82,14 @@ class DataParser:
         """Parses Excel spreadsheets (.xlsx, .xls) using the matching engine."""
         try:
             excel_io = io.BytesIO(content)
-            engine = "xlrd" if content.startswith(XLS_LEGACY_MAGIC_BYTES) else "openpyxl"
+            engine: Literal["xlrd", "openpyxl"] = (
+                "xlrd" if content.startswith(XLS_LEGACY_MAGIC_BYTES) else "openpyxl"
+            )
+            sheet_arg: Union[str, int] = 0 if sheet_name is None else sheet_name
+
             df_result = pd.read_excel(
                 excel_io,
-                sheet_name=sheet_name,
+                sheet_name=sheet_arg,
                 engine=engine,
                 dtype=object,
             )

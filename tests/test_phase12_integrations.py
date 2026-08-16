@@ -5,7 +5,7 @@ import hmac
 import json
 import time
 import unittest
-from typing import Any, Dict, List
+from typing import Any
 from fastapi.testclient import TestClient
 
 from aurix_api.app import create_app

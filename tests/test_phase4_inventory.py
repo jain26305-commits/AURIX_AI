@@ -2,7 +2,6 @@
 
 import unittest
 from typing import Any, Dict, List, Optional
-import pandas as pd
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -37,7 +36,7 @@ class TestPhase4Inventory(unittest.TestCase):
 
         fc_points = [
             {
-                "date": f"2026-08-{i+1:02d}",
+                "date": f"2026-08-{i + 1:02d}",
                 "point_forecast": val,
                 "raw_model_forecast": val,
                 "constraint_applied": False,
@@ -241,6 +240,7 @@ class TestPhase4InventoryPersistence(unittest.TestCase):
         class MockInventoryOrchestrator:
             def __init__(self, portfolio_data: Any, config: Any) -> None:
                 pass
+
             def execute(self) -> Dict[str, Any]:
                 return {
                     "replenishment_policies": [
@@ -323,6 +323,7 @@ class TestPhase4InventoryPersistence(unittest.TestCase):
         class MockMissingFinancialsOrchestrator:
             def __init__(self, portfolio_data: Any, config: Any) -> None:
                 pass
+
             def execute(self) -> Dict[str, Any]:
                 return {
                     "replenishment_policies": [{"sku_id": "SKU-NO-COST", "holding_cost_exposure": None}]
@@ -344,6 +345,7 @@ class TestPhase4InventoryPersistence(unittest.TestCase):
         class FailingOrchestrator:
             def __init__(self, portfolio_data: Any, config: Any) -> None:
                 pass
+
             def execute(self) -> Dict[str, Any]:
                 raise ZeroDivisionError("Simulated EOQ zero division error")
 

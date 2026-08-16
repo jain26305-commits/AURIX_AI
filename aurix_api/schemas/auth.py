@@ -1,6 +1,6 @@
 """Authentication and Role-Based Access Control (RBAC) schemas for Phases 10–14."""
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, Field

@@ -10,7 +10,6 @@ from aurix_api.schemas.auth import Permission, TenantContext
 from aurix_api.schemas.base import ApiResponse, ResponseMetadata, ResponseStatus
 from aurix_api.schemas.integrations import (
     ConnectorCreateRequest,
-    ConnectorUpdateRequest,
     ReconcileDatasetsRequest,
     ReconciliationSummaryResponse,
     TriggerSyncRequest,
@@ -27,7 +26,6 @@ from aurix_core.integrations.adapters.wms_generic import GenericWmsConnector
 from aurix_core.integrations.base import BaseConnector, ConnectorException
 from aurix_core.integrations.contracts import (
     ConnectorConfig,
-    ConnectorHealthState,
     IntegrationHealthReport,
     ReconciliationStatus,
     SourceLineageRecord,

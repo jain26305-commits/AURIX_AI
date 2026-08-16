@@ -422,7 +422,7 @@ class TestPhase3ForecastingPersistence(unittest.TestCase):
         points = point_repo.list_by_run_id(res["forecast_run_id"])
 
         for pt in points:
-            self.assertGreaterEqual(pt.point_forecast, 0.0)
+            self.assertGreaterEqual(float(pt.point_forecast), 0.0)
 
     def test_35_transaction_rollback_on_failure(self) -> None:
         """Verifies that engine exceptions trigger atomic rollbacks and log FAILED run states."""
