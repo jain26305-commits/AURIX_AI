@@ -1,0 +1,76 @@
+# ============================================================
+# AURIX Enterprise Platform — Git Ignore Specification
+# ============================================================
+
+# 1. Byte-compiled / Optimized / Python Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 2. Testing, Coverage & Static Analysis Caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# 3. Virtual Environments & Local Configuration
+.env
+.env.*
+!.env.example
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# 4. Local SQLite Databases & Volatile Runtime Stores
+*.db
+*.sqlite
+*.sqlite3
+aurix_enterprise.db
+
+# 5. IDE, Editor & OS Specific Files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# 6. Logs & Debug Transients
+*.log
+logs/
+artifacts/models/*
+!artifacts/models/.gitkeep
+artifacts/models/*
+!artifacts/models/.gitkeep

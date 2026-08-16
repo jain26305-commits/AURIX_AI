@@ -1,0 +1,18 @@
+[flake8]
+max-line-length = 120
+exclude =
+    .git,
+    __pycache__,
+    build,
+    dist,
+    venv,
+    .venv,
+    artifacts
+ignore =
+    E203,
+    W503
+per-file-ignores =
+    __init__.py: F401
+
+'''Remove-Item -Recurse -Force .pytest_cache, aurix_core\__pycache__, tests\__pycache__ -ErrorAction Ignore; python -m mypy aurix_core/ tests/ --strict; python -m flake8 aurix_core/ tests/ --max-line-length=120; python -m pytest tests/ -v'''
+"""find . -type d -name "__pycache__" -exec rm -rf {} + && rm -rf .pytest_cache && python -m mypy aurix_core/ tests/ --strict && python -m flake8 aurix_core/ tests/ --max-line-length=120 && python -m pytest tests/ -v"""

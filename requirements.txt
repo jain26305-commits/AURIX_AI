@@ -1,0 +1,35 @@
+# ============================================================
+# AURIX Enterprise Platform — Locked Dependency Manifest (v16.1)
+# ============================================================
+
+# Core Web Framework & Server
+fastapi==0.110.0
+uvicorn==0.28.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
+
+# Database & Migration Engine
+SQLAlchemy==2.0.47
+alembic==1.13.1
+psycopg[binary]==3.2.10
+
+# Data Science, Math & Machine Learning Engines
+pandas==2.3.3
+numpy==2.5.1
+scikit-learn==1.9.0
+statsmodels==0.14.6
+joblib==1.5.2
+
+# File Ingestion & Parsing Utilities
+openpyxl==3.1.2
+xlrd==2.0.1
+
+# HTTP Networking & Integration Clients
+requests==2.31.0
+httpx==0.27.0
+
+# Quality Gates, Linting & Testing Tools
+pytest==8.1.1
+mypy==1.9.0
+flake8==7.0.0
+python-multipart==0.0.20

@@ -1,0 +1,37 @@
+# Git and repository metadata
+.git/
+.github/
+
+# Python caches / test caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+
+# Local environments and secrets
+.env
+.env.*
+!.env.example
+
+# Local runtime databases / temporary DBs
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs / OS / IDE
+*.log
+logs/
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Local test uploads / generated temporary artifacts
+tests/
+docs/
