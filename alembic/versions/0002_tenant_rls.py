@@ -6,6 +6,7 @@ Revises: 0001_initial_aurix_schema
 
 from alembic import op
 
+
 revision = "0002_tenant_rls"
 down_revision = "0001_initial_aurix_schema"
 branch_labels = None
@@ -31,22 +32,24 @@ def upgrade() -> None:
                     table_record.table_schema,
                     table_record.table_name
                 );
+
                 EXECUTE format(
                     'ALTER TABLE %I.%I FORCE ROW LEVEL SECURITY',
                     table_record.table_schema,
                     table_record.table_name
                 );
+
                 EXECUTE format(
                     'DROP POLICY IF EXISTS aurix_tenant_isolation ON %I.%I',
                     table_record.table_schema,
                     table_record.table_name
                 );
+
                 EXECUTE format(
-                    CREATE POLICY aurix_tenant_isolation
-                    ON ...
-                    TO aurix_app
-                    USING (tenant_id = current_setting('app.tenant_id', true))
-                    WITH CHECK (tenant_id = current_setting('app.tenant_id', true)),
+                    'CREATE POLICY aurix_tenant_isolation '
+                    'ON %I.%I '
+                    'USING (tenant_id = current_setting(''app.tenant_id'', true)) '
+                    'WITH CHECK (tenant_id = current_setting(''app.tenant_id'', true))',
                     table_record.table_schema,
                     table_record.table_name
                 );
@@ -75,11 +78,13 @@ def downgrade() -> None:
                     table_record.table_schema,
                     table_record.table_name
                 );
+
                 EXECUTE format(
                     'ALTER TABLE %I.%I NO FORCE ROW LEVEL SECURITY',
                     table_record.table_schema,
                     table_record.table_name
                 );
+
                 EXECUTE format(
                     'ALTER TABLE %I.%I DISABLE ROW LEVEL SECURITY',
                     table_record.table_schema,
