@@ -4,6 +4,7 @@ import logging
 import threading
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple, cast
+
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -17,19 +18,25 @@ from aurix_core.events.contracts import (
 )
 from aurix_core.events.router import EventRouter, EventRoutingDecision
 from aurix_core.intelligence.service import IntelligenceService
-from aurix_core.database.models.events import PersistentEventModel, PersistentQuarantineModel, PersistentAlertModel
+from aurix_core.database.models.events import (
+    PersistentEventModel,
+    PersistentQuarantineModel,
+    PersistentAlertModel,
+)
 
 logger = logging.getLogger("aurix_core.events.processor")
 
 
 class EventProcessingResult(BaseModel):
     """Result summary of processing an internal operational event."""
+
     event_id: str
     tenant_id: str
     status: EventStatus
     dirty_capabilities: List[str] = Field(default_factory=list)
     recomputation_executed: bool = False
     alerts_generated: List[AlertContract] = Field(default_factory=list)
+    phase16_case_id: Optional[str] = None
     error_message: Optional[str] = None
 
 
@@ -57,7 +64,13 @@ class EventProcessor:
         return True, None
 
     @classmethod
-    def check_idempotency(cls, tenant_id: str, event_id: str, payload_hash: str, db: Optional[Session] = None) -> bool:
+    def check_idempotency(
+        cls,
+        tenant_id: str,
+        event_id: str,
+        payload_hash: str,
+        db: Optional[Session] = None,
+    ) -> bool:
         """Returns True if the event has already been successfully processed for this tenant."""
         key = f"{event_id}:{payload_hash}"
         with cls._lock:
@@ -65,7 +78,14 @@ class EventProcessor:
             return key in tenant_cache
 
     @classmethod
-    def mark_processed(cls, tenant_id: str, event_id: str, payload_hash: str, db: Optional[Session] = None) -> None:
+    def mark_processed(
+        cls,
+        tenant_id: str,
+        event_id: str,
+        payload_hash: str,
+        db: Optional[Session] = None,
+        commit: bool = True,
+    ) -> None:
         """Records an event as successfully processed in memory cache and database."""
         key = f"{event_id}:{payload_hash}"
         with cls._lock:
@@ -74,10 +94,14 @@ class EventProcessor:
 
         if db is not None:
             try:
-                db_event = db.query(PersistentEventModel).filter(
-                    PersistentEventModel.tenant_id == tenant_id,
-                    PersistentEventModel.event_id == event_id,
-                ).first()
+                db_event = (
+                    db.query(PersistentEventModel)
+                    .filter(
+                        PersistentEventModel.tenant_id == tenant_id,
+                        PersistentEventModel.event_id == event_id,
+                    )
+                    .first()
+                )
                 if db_event:
                     db_event.status = cast(Any, EventStatus.COMPLETED.value)
                     db_event.idempotency_key = cast(Any, key)
@@ -89,7 +113,8 @@ class EventProcessor:
                         status=EventStatus.COMPLETED.value,
                     )
                     db.add(db_event)
-                db.commit()
+                if commit:
+                    db.commit()
             except Exception:
                 db.rollback()
 
@@ -116,12 +141,22 @@ class EventProcessor:
                 status=EventStatus.QUARANTINED,
                 error_message=err_msg,
             )
+
         event.status = EventStatus.VALIDATED
 
         # 2. Idempotency Check (Returns EventStatus.DUPLICATE on replay)
-        if cls.check_idempotency(tenant_id, event.event_id, event.payload_hash, db=db):
+        if cls.check_idempotency(
+            tenant_id,
+            event.event_id,
+            event.payload_hash,
+            db=db,
+        ):
             event.status = EventStatus.DUPLICATE
-            logger.info("Duplicate event suppressed for tenant [%s]: %s", tenant_id, event.event_id)
+            logger.info(
+                "Duplicate event suppressed for tenant [%s]: %s",
+                tenant_id,
+                event.event_id,
+            )
             return EventProcessingResult(
                 event_id=event.event_id,
                 tenant_id=tenant_id,
@@ -143,18 +178,42 @@ class EventProcessor:
                 intelligence_service = IntelligenceService(db, tenant_id)
                 intelligence_service.run_autonomous_intelligence(
                     canonical_datasets=datasets,
-                    config={"target_capabilities": routing_decision.dirty_capabilities},
+                    config={
+                        "target_capabilities": routing_decision.dirty_capabilities
+                    },
                 )
                 recomputation_executed = True
 
-            cls._invalidate_tenant_caches(tenant_id, routing_decision.canonical_entity_name, event.entity_id)
-            alerts = cls._evaluate_and_generate_alerts(event, routing_decision, db=db)
+            cls._invalidate_tenant_caches(
+                tenant_id,
+                routing_decision.canonical_entity_name,
+                event.entity_id,
+            )
+            alerts = cls._evaluate_and_generate_alerts(
+                event,
+                routing_decision,
+                db=db,
+            )
+            phase16_case_id = None
+            if event.event_type in (
+                EventTaxonomy.SUPPLIER_UPDATED,
+                EventTaxonomy.ETA_CHANGED,
+            ):
+                from aurix_core.phase16.event_bridge import Phase16EventBridge
 
+                phase16_case_id = Phase16EventBridge.handle(db, event)
+
+            cls.mark_processed(
+                tenant_id,
+                event.event_id,
+                event.payload_hash,
+                db=db,
+                commit=False,
+            )
             db.commit()
-            cls.mark_processed(tenant_id, event.event_id, event.payload_hash, db=db)
             event.status = EventStatus.COMPLETED
 
-            logger.info(
+            logger.debug(
                 "Event successfully processed [ID: %s, Tenant: %s] -> Recomputed Capabilities: %s",
                 event.event_id,
                 tenant_id,
@@ -168,6 +227,7 @@ class EventProcessor:
                 dirty_capabilities=routing_decision.dirty_capabilities,
                 recomputation_executed=recomputation_executed,
                 alerts_generated=alerts,
+                phase16_case_id=phase16_case_id,
             )
 
         except Exception as e:
@@ -195,9 +255,14 @@ class EventProcessor:
             )
 
     @classmethod
-    def _invalidate_tenant_caches(cls, tenant_id: str, entity_name: str, entity_id: str) -> None:
+    def _invalidate_tenant_caches(
+        cls,
+        tenant_id: str,
+        entity_name: str,
+        entity_id: str,
+    ) -> None:
         """Invalidates targeted analytical snapshots and AI contexts without flushing unaffected caches."""
-        logger.info(
+        logger.debug(
             "Targeted cache & AI context invalidation executed for Tenant [%s], Entity [%s:%s]",
             tenant_id,
             entity_name,
@@ -224,10 +289,16 @@ class EventProcessor:
                 if event.event_type == EventTaxonomy.INVENTORY_UPDATED
                 else AlertSeverity.MEDIUM
             )
-            dedup_key = f"{event.tenant_id}:{event.entity_type}:{event.entity_id}:{event.event_type.value}"
+            dedup_key = (
+                f"{event.tenant_id}:{event.entity_type}:"
+                f"{event.entity_id}:{event.event_type.value}"
+            )
 
             with cls._lock:
-                tenant_alerts = cls._ACTIVE_ALERTS.setdefault(event.tenant_id, {})
+                tenant_alerts = cls._ACTIVE_ALERTS.setdefault(
+                    event.tenant_id,
+                    {},
+                )
                 if dedup_key not in tenant_alerts:
                     alert_id = f"ALT-{uuid.uuid4().hex[:8].upper()}"
                     alert = AlertContract(
@@ -235,12 +306,25 @@ class EventProcessor:
                         tenant_id=event.tenant_id,
                         severity=severity,
                         event_id=event.event_id,
-                        capability_name=routing.dirty_capabilities[0] if routing.dirty_capabilities else None,
+                        capability_name=(
+                            routing.dirty_capabilities[0]
+                            if routing.dirty_capabilities
+                            else None
+                        ),
                         entity_id=event.entity_id,
-                        title=f"Operational Alert: {event.event_type.value} on {event.entity_id}",
-                        description=f"Event received from {event.source_system} triggering downstream recomputation.",
+                        title=(
+                            f"Operational Alert: {event.event_type.value} "
+                            f"on {event.entity_id}"
+                        ),
+                        description=(
+                            f"Event received from {event.source_system} "
+                            "triggering downstream recomputation."
+                        ),
                         status=AlertStatus.ACTIVE,
-                        evidence_reference={"changed_fields": event.changed_fields, "payload": event.payload},
+                        evidence_reference={
+                            "changed_fields": event.changed_fields,
+                            "payload": event.payload,
+                        },
                         deduplication_key=dedup_key,
                     )
                     tenant_alerts[dedup_key] = alert
@@ -254,23 +338,34 @@ class EventProcessor:
                                 event_id=cast(Any, event.event_id),
                                 severity=cast(Any, severity.value),
                                 title=cast(Any, alert.title),
-                                description=cast(Any, alert.description or ""),
+                                description=cast(
+                                    Any,
+                                    alert.description or "",
+                                ),
                                 status=cast(Any, AlertStatus.ACTIVE.value),
                                 deduplication_key=cast(Any, dedup_key),
                             )
                             db.add(db_alert)
-                            db.commit()
+                            db.flush()
                         except Exception:
                             db.rollback()
 
         return alerts
 
     @classmethod
-    def _quarantine_event(cls, event: InternalEvent, reason: str, db: Optional[Session] = None) -> None:
+    def _quarantine_event(
+        cls,
+        event: InternalEvent,
+        reason: str,
+        db: Optional[Session] = None,
+    ) -> None:
         """Moves an unprocessable event to dead-letter quarantine store."""
         event.status = EventStatus.QUARANTINED
         with cls._lock:
-            tenant_quarantine = cls._QUARANTINED_STORE.setdefault(event.tenant_id, [])
+            tenant_quarantine = cls._QUARANTINED_STORE.setdefault(
+                event.tenant_id,
+                [],
+            )
             tenant_quarantine.append(event)
 
         if db is not None:
@@ -295,19 +390,31 @@ class EventProcessor:
         )
 
     @classmethod
-    def get_quarantined_events(cls, tenant_id: str, db: Optional[Session] = None) -> List[InternalEvent]:
+    def get_quarantined_events(
+        cls,
+        tenant_id: str,
+        db: Optional[Session] = None,
+    ) -> List[InternalEvent]:
         """Retrieves all dead-letter quarantined events for a specific tenant."""
         with cls._lock:
             return list(cls._QUARANTINED_STORE.get(tenant_id, []))
 
     @classmethod
-    def get_active_alerts(cls, tenant_id: str, db: Optional[Session] = None) -> List[AlertContract]:
+    def get_active_alerts(
+        cls,
+        tenant_id: str,
+        db: Optional[Session] = None,
+    ) -> List[AlertContract]:
         """Retrieves all active alerts for a specific tenant."""
         with cls._lock:
             return list(cls._ACTIVE_ALERTS.get(tenant_id, {}).values())
 
     @classmethod
-    def clear_stores(cls, tenant_id: Optional[str] = None, db: Optional[Session] = None) -> None:
+    def clear_stores(
+        cls,
+        tenant_id: Optional[str] = None,
+        db: Optional[Session] = None,
+    ) -> None:
         """Utility for test suite resets and maintenance sweeps across memory and database."""
         with cls._lock:
             if tenant_id:
@@ -325,9 +432,15 @@ class EventProcessor:
                 q_quar = db.query(PersistentQuarantineModel)
                 q_alerts = db.query(PersistentAlertModel)
                 if tenant_id:
-                    q_events = q_events.filter(PersistentEventModel.tenant_id == tenant_id)
-                    q_quar = q_quar.filter(PersistentQuarantineModel.tenant_id == tenant_id)
-                    q_alerts = q_alerts.filter(PersistentAlertModel.tenant_id == tenant_id)
+                    q_events = q_events.filter(
+                        PersistentEventModel.tenant_id == tenant_id
+                    )
+                    q_quar = q_quar.filter(
+                        PersistentQuarantineModel.tenant_id == tenant_id
+                    )
+                    q_alerts = q_alerts.filter(
+                        PersistentAlertModel.tenant_id == tenant_id
+                    )
                 q_events.delete(synchronize_session=False)
                 q_quar.delete(synchronize_session=False)
                 q_alerts.delete(synchronize_session=False)

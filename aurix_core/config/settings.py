@@ -21,6 +21,10 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "sqlite:///./aurix_enterprise.db"
+    alembic_database_url: str = Field(
+        default="",
+        description="Explicit database URL override for Alembic migration execution.",
+    )
     database_disable_prepared_statements: bool = Field(default=False)
 
     # Multi-tenancy
@@ -43,7 +47,7 @@ class Settings(BaseSettings):
     supabase_service_role_key: str = ""
 
     # Runtime build identity
-    build_version: str = Field(default="15.1.0")
+    build_version: str = Field(default="16.0.0")
     schema_version: str = Field(default="1.0.0")
     release_commit: str = Field(default="HEAD")
 
@@ -91,7 +95,6 @@ class Settings(BaseSettings):
 
     # Cloud AI providers
     gemini_api_key: str = Field(default="")
-    groq_api_key: str = Field(default="")
     cloudflare_account_id: str = Field(default="")
     cloudflare_api_token: str = Field(default="")
 

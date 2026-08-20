@@ -35,6 +35,8 @@ from aurix_core.intelligence.discovery import CapabilityDiscoveryEngine
 from aurix_core.intelligence.incremental import IncrementalMergeEngine, IncrementalUpdateReport
 from aurix_core.intelligence.readiness import DataReadinessEngine, ReadinessAssessment
 from aurix_core.intelligence.router import BusinessRouter, PageContext
+from aurix_core.tools.executor import DeterministicToolExecutor
+from aurix_core.observability.metrics import MetricsRegistry
 
 
 class IntelligenceService:
@@ -309,19 +311,53 @@ class IntelligenceService:
             conversation_history=conv_history,
         )
 
-        # 6. Build Grounded FactPack Preserving Exact Metadata & Entity Scope
-        fact_pack = ContextBuilder.build_fact_pack(
-            tenant_id=self.tenant_id,
-            routing_decision=routing_decision,
-            analytical_data=analytical_data,
-            page_context=page_context,
-        )
+        # 6. Deterministic-first execution. A registered AURIX tool is
+        # authoritative for direct READ queries and is never escalated to AI.
+        if routing_decision.fast_path_eligible and routing_decision.target_tool:
+            tool_result = DeterministicToolExecutor.execute(
+                db=self.db,
+                tenant_id=self.tenant_id,
+                query=query,
+                routing=routing_decision,
+            )
+            response_contract = AIResponseContract(
+                response_id=f"RESP-AURIX-{uuid.uuid4().hex[:10].upper()}",
+                response_type=routing_decision.query_type.value,
+                headline="AURIX Engine Result",
+                verified_facts=[tool_result.answer] if tool_result.answer else [],
+                explanation=tool_result.answer,
+                recommendations=[],
+                data_limitations=tool_result.limitations,
+                source="AURIX_ENGINE",
+                answer_source="AURIX_ENGINE",
+                evidence_quality="HIGH" if tool_result.success else "INSUFFICIENT_EVIDENCE",
+                freshness="LIVE" if tool_result.success else "UNKNOWN",
+                provider_used="AURIX_ENGINE",
+                provider_status="LIVE",
+                model_used="deterministic-tool",
+                is_fallback=False,
+                token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                provenance={
+                    "tool_name": tool_result.tool_name,
+                    "capability": tool_result.capability,
+                    **tool_result.provenance,
+                },
+            )
+        else:
+            # 7. AI escalation path is only reached when AURIX cannot answer
+            # deterministically. The same grounded FactPack is used for AI.
+            fact_pack = ContextBuilder.build_fact_pack(
+                tenant_id=self.tenant_id,
+                routing_decision=routing_decision,
+                analytical_data=analytical_data,
+                page_context=page_context,
+            )
 
-        # 7. Process Query through Multi-Tier AI Gateway
-        response_contract = self.gateway.process_query(
-            fact_pack=fact_pack,
-            routing_decision=routing_decision,
-        )
+            response_contract = self.gateway.process_query(
+                fact_pack=fact_pack,
+                routing_decision=routing_decision,
+                db=self.db,
+            )
 
         # 8. Persist Assistant Response Message
         asst_msg = ConversationMessageModel(
@@ -335,7 +371,14 @@ class IntelligenceService:
         )
         self.db.add(asst_msg)
 
-        # 9. Record AI Audit Log
+        # 9. Record resolution telemetry and audit metadata.
+        deterministic_answer = response_contract.answer_source == "AURIX_ENGINE"
+        MetricsRegistry.record_query_resolution(
+            deterministic=deterministic_answer,
+            success=deterministic_answer and bool(response_contract.explanation)
+            or not deterministic_answer,
+        )
+
         audit_rec = AIAuditLogModel(
             id=f"AUDIT-{uuid.uuid4().hex[:10].upper()}",
             tenant_id=self.tenant_id,
@@ -343,11 +386,15 @@ class IntelligenceService:
             query_type=routing_decision.query_type.value,
             provider_name=response_contract.provider_used,
             model_name=response_contract.model_used,
-            status="SUCCESS",
+            status=("DETERMINISTIC" if deterministic_answer else "SUCCESS"),
             grounding_status=(
-                "VALIDATED"
-                if not response_contract.is_fallback
-                else "DETERMINISTIC_FAST_PATH"
+                "DETERMINISTIC_FAST_PATH"
+                if deterministic_answer
+                else (
+                    "VALIDATED"
+                    if not response_contract.is_fallback
+                    else "FALLBACK"
+                )
             ),
             routing_meta_json=json.dumps(routing_decision.model_dump(), default=str),
             token_usage_json=json.dumps(response_contract.token_usage, default=str),

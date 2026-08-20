@@ -491,7 +491,7 @@ class TestPhase9RouterAndGrounding(unittest.TestCase):
         )
         routing = BusinessRouter.route("Explain performance for SUP-A")
 
-        gateway = AIGateway(simulate_gemini_failure=True, simulate_groq_failure=True, simulate_workers_failure=True)
+        gateway = AIGateway(simulate_gemini_failure=True, simulate_cloudflare_failure=True)
         resp = gateway.process_query(fact_pack, routing)
 
         self.assertIsNotNone(resp)

@@ -21,6 +21,7 @@ from aurix_core.database.models import (  # noqa: F401
     inventory_intelligence,
     logistics_intelligence,
     network_intelligence,
+    phase16,
     quota,
     supply_chain,
     supply_intelligence,
@@ -35,21 +36,22 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# Respect an explicit ALEMBIC_DATABASE_URL first.
-# Otherwise use the URL defined in alembic.ini.
-# Only fall back to the application settings when neither exists.
+# 1. Resolve database URL priority
 configured_url = (
     os.getenv("ALEMBIC_DATABASE_URL")
     or config.get_main_option("sqlalchemy.url")
 )
 
 if not configured_url or configured_url.startswith("driver://"):
-    configured_url = settings.database_url
+    configured_url = str(settings.alembic_database_url or settings.database_url)
 
-config.set_main_option(
-    "sqlalchemy.url",
-    configured_url,
-)
+# 2. Sanitize async drivers for Alembic's sync engine
+if configured_url.startswith("postgresql+asyncpg://"):
+    configured_url = configured_url.replace("postgresql+asyncpg://", "postgresql+psycopg://")
+elif configured_url.startswith("sqlite+aiosqlite://"):
+    configured_url = configured_url.replace("sqlite+aiosqlite://", "sqlite://")
+
+config.set_main_option("sqlalchemy.url", configured_url)
 
 
 def run_migrations_offline() -> None:
@@ -63,6 +65,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
+        render_as_batch=True,  # Enables ALTER/DROP compatibility on SQLite
     )
 
     with context.begin_transaction():
@@ -72,10 +75,7 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run Alembic migrations using a live database connection."""
     connectable = engine_from_config(
-        config.get_section(
-            config.config_ini_section,
-            {},
-        ),
+        config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )
@@ -86,6 +86,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
+            render_as_batch=True,  # Enables ALTER/DROP compatibility on SQLite
         )
 
         with context.begin_transaction():

@@ -2,6 +2,7 @@
 
 import logging
 from typing import Any, Dict, List
+
 from pydantic import BaseModel, Field
 
 from aurix_core.events.contracts import EventTaxonomy, InternalEvent
@@ -12,6 +13,7 @@ logger = logging.getLogger("aurix_core.events.router")
 
 class EventRoutingDecision(BaseModel):
     """Result of event impact analysis and capability invalidation routing."""
+
     event_id: str
     tenant_id: str
     event_type: EventTaxonomy
@@ -44,12 +46,18 @@ class EventRouter:
 
     @classmethod
     def route_event(cls, event: InternalEvent) -> EventRoutingDecision:
-        """Analyzes an internal event, resolves its canonical entity, and queries the Phase 9 capability graph."""
+        """Analyze an internal event and resolve its dirty capability branches."""
         canonical_entity = cls.EVENT_ENTITY_MAP.get(event.event_type, event.entity_type)
-        dirty_caps = IncrementalMergeEngine.ENTITY_CAPABILITY_GRAPH.get(canonical_entity, [])
-        requires_recompute = len(dirty_caps) > 0 and event.event_type != EventTaxonomy.SOURCE_SYNC_FAILED
+        dirty_caps = IncrementalMergeEngine.ENTITY_CAPABILITY_GRAPH.get(
+            canonical_entity,
+            [],
+        )
+        requires_recompute = (
+            len(dirty_caps) > 0
+            and event.event_type != EventTaxonomy.SOURCE_SYNC_FAILED
+        )
 
-        logger.info(
+        logger.debug(
             "Event routed [ID: %s, Type: %s] -> Entity [%s] -> Dirty Capabilities: %s",
             event.event_id,
             event.event_type,

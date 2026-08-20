@@ -68,6 +68,8 @@ jobs:
 
       - name: Validate PostgreSQL Migrations
         env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/aurix_ci
+          ALEMBIC_DATABASE_URL: postgresql+psycopg://postgres:postgres@localhost:5432/aurix_ci
           PGPASSWORD: postgres
         run: |
           alembic upgrade head

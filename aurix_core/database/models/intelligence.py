@@ -150,7 +150,7 @@ class AIAuditLogModel(Base, TenantMixin):
     id = Column(String(64), primary_key=True, index=True)
     conversation_id = Column(String(64), nullable=True, index=True)
     query_type = Column(String(32), nullable=False)  # READ, ANALYZE, EXPLAIN, SIMULATE, etc.
-    provider_name = Column(String(64), nullable=False)  # GeminiFlashLite, GeminiFlash, Groq, Fallback
+    provider_name = Column(String(64), nullable=False)  # Gemini, Cloudflare, DeterministicFallback
     model_name = Column(String(64), nullable=False)
     status = Column(String(32), nullable=False)  # SUCCESS, FALLBACK, REJECTED
     grounding_status = Column(String(32), nullable=False)  # VALIDATED, UNGROUNDED, DETERMINISTIC_FAST_PATH

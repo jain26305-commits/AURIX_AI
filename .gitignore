@@ -72,5 +72,3 @@ Thumbs.db
 logs/
 artifacts/models/*
 !artifacts/models/.gitkeep
-artifacts/models/*
-!artifacts/models/.gitkeep

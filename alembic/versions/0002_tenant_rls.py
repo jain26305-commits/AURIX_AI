@@ -4,17 +4,21 @@ Revision ID: 0002_tenant_rls
 Revises: 0001_initial_aurix_schema
 """
 
+from typing import Sequence, Union
+
 from alembic import op
 
-
-revision = "0002_tenant_rls"
-down_revision = "0001_initial_aurix_schema"
-branch_labels = None
-depends_on = None
+revision: str = "0002_tenant_rls"
+down_revision: Union[str, None] = "0001_initial_aurix_schema"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    """Enable and force tenant-scoped RLS using a transaction-local setting."""
+    """Enable tenant-scoped RLS on PostgreSQL; no-op on SQLite."""
+    if op.get_bind().dialect.name != "postgresql":
+        return
+
     op.execute(
         """
         DO $$
@@ -60,7 +64,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Remove AURIX tenant RLS policies and enforcement."""
+    """Remove AURIX tenant RLS policies and enforcement on PostgreSQL."""
+    if op.get_bind().dialect.name != "postgresql":
+        return
+
     op.execute(
         """
         DO $$

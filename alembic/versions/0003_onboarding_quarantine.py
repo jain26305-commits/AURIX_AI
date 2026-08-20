@@ -4,13 +4,15 @@ Revision ID: 0003_onboarding_quarantine
 Revises: 0002_tenant_rls
 """
 
+from typing import Sequence, Union
+
 from alembic import op
 import sqlalchemy as sa
 
-revision = "0003_onboarding_quarantine"
-down_revision = "0002_tenant_rls"
-branch_labels = None
-depends_on = None
+revision: str = "0003_onboarding_quarantine"
+down_revision: Union[str, None] = "0002_tenant_rls"
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
@@ -29,21 +31,25 @@ def upgrade() -> None:
     op.create_index("ix_onboarding_quarantine_run_id", "onboarding_quarantine", ["run_id"])
     op.create_index("ix_onboarding_quarantine_row_hash", "onboarding_quarantine", ["row_hash"])
 
-    # Apply the same tenant RLS policy as every other tenant-owned table.
-    op.execute("""
-        ALTER TABLE onboarding_quarantine ENABLE ROW LEVEL SECURITY;
-        ALTER TABLE onboarding_quarantine FORCE ROW LEVEL SECURITY;
-        CREATE POLICY aurix_tenant_isolation
-        ON onboarding_quarantine
-        USING (tenant_id = current_setting('app.tenant_id', true))
-        WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
-    """)
+    # RLS is PostgreSQL-specific; SQLite development/test migrations still create
+    # the table and indexes but skip policy DDL.
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute("""
+            ALTER TABLE onboarding_quarantine ENABLE ROW LEVEL SECURITY;
+            ALTER TABLE onboarding_quarantine FORCE ROW LEVEL SECURITY;
+            DROP POLICY IF EXISTS aurix_tenant_isolation ON onboarding_quarantine;
+            CREATE POLICY aurix_tenant_isolation
+            ON onboarding_quarantine
+            USING (tenant_id = current_setting('app.tenant_id', true))
+            WITH CHECK (tenant_id = current_setting('app.tenant_id', true));
+        """)
 
 
 def downgrade() -> None:
-    op.execute("DROP POLICY IF EXISTS aurix_tenant_isolation ON onboarding_quarantine")
-    op.execute("ALTER TABLE onboarding_quarantine NO FORCE ROW LEVEL SECURITY")
-    op.execute("ALTER TABLE onboarding_quarantine DISABLE ROW LEVEL SECURITY")
+    if op.get_bind().dialect.name == "postgresql":
+        op.execute("DROP POLICY IF EXISTS aurix_tenant_isolation ON onboarding_quarantine")
+        op.execute("ALTER TABLE onboarding_quarantine NO FORCE ROW LEVEL SECURITY")
+        op.execute("ALTER TABLE onboarding_quarantine DISABLE ROW LEVEL SECURITY")
     op.drop_index("ix_onboarding_quarantine_row_hash", table_name="onboarding_quarantine")
     op.drop_index("ix_onboarding_quarantine_run_id", table_name="onboarding_quarantine")
     op.drop_index("ix_onboarding_quarantine_tenant_id", table_name="onboarding_quarantine")

@@ -41,7 +41,8 @@ class AiQueryResponse(BaseModel):
     source: str = "AURIX_DETERMINISTIC_PLATFORM"
     evidence_quality: str = "HIGH"
     freshness: str = "UNKNOWN"
-    provider_used: str = "DETERMINISTIC_FALLBACK"
+    provider_used: str = "AURIX_ENGINE"
+    answer_source: str = "AURIX_ENGINE"
     model_used: str = "aurix-copilot-v1"
     is_fallback: bool = False
     confidence_score: float = 0.95

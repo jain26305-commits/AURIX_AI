@@ -39,8 +39,7 @@ class AIProviderType(str, Enum):
 
     GEMINI_FLASH_LITE = "GEMINI_FLASH_LITE"
     GEMINI_FLASH = "GEMINI_FLASH"
-    GROQ = "GROQ"
-    WORKERS_AI = "WORKERS_AI"
+    CLOUDFLARE = "CLOUDFLARE"
     DETERMINISTIC_FALLBACK = "DETERMINISTIC_FALLBACK"
 
 
@@ -75,6 +74,7 @@ class AIResponseContract(BaseModel):
         default_factory=list
     )
     source: str = "AURIX_DETERMINISTIC_PLATFORM"
+    answer_source: str = "AI_ESCALATION"
     evidence_quality: str = "HIGH"
     freshness: str = "UNKNOWN"
     provider_used: str
@@ -307,6 +307,7 @@ class DeterministicFallbackProvider(
             source=(
                 "AURIX_DETERMINISTIC_PLATFORM"
             ),
+            answer_source="DETERMINISTIC_FALLBACK",
             evidence_quality=evidence_quality,
             freshness=overall_freshness,
             provider_used=self.provider_name,
@@ -537,103 +538,7 @@ class GeminiFlashProvider(
         return contract, True, None
 
 
-class GroqProvider(BaseAIProvider):
-    """Secondary failover provider."""
-
-    def __init__(
-        self,
-        simulate_failure: bool = False,
-    ) -> None:
-        has_key = bool(
-            settings.groq_api_key.strip()
-        )
-
-        super().__init__(
-            provider_name=(
-                AIProviderType.GROQ.value
-            ),
-            model_name=(
-                "llama-3.3-70b-versatile"
-            ),
-            has_live_credentials=has_key,
-        )
-
-        self.simulate_failure = simulate_failure
-
-        if self.simulate_failure:
-            self.status = (
-                ProviderStatus.UNAVAILABLE.value
-            )
-
-    def generate(
-        self,
-        fact_pack: FactPack,
-        routing_decision: RoutingDecision,
-    ) -> Tuple[
-        Optional[AIResponseContract],
-        bool,
-        Optional[str],
-    ]:
-        if self.simulate_failure:
-            return (
-                None,
-                False,
-                "Simulated Groq gateway error.",
-            )
-
-        response_id = (
-            f"RESP-GROQ-"
-            f"{uuid.uuid4().hex[:10].upper()}"
-        )
-
-        facts_list = [
-            f"{fact.metric_name}: {fact.value}"
-            for fact in fact_pack.facts
-            if fact.value is not None
-        ]
-
-        overall_freshness = (
-            _resolve_overall_freshness(
-                fact_pack.facts
-            )
-        )
-
-        contract = AIResponseContract(
-            response_id=response_id,
-            response_type=(
-                routing_decision.query_type.value
-            ),
-            headline=(
-                "Groq Failover "
-                "Intelligence Report"
-            ),
-            verified_facts=facts_list,
-            explanation=(
-                "Processed via secondary "
-                "Groq failover tier."
-            ),
-            recommendations=[],
-            data_limitations=[],
-            freshness=overall_freshness,
-            provider_used=self.provider_name,
-            provider_status=self.status,
-            model_used=self.model_name,
-            is_fallback=True,
-            token_usage={
-                "prompt_tokens": 150,
-                "completion_tokens": 60,
-                "total_tokens": 210,
-            },
-            provenance={
-                "failover_tier": "SECONDARY",
-                "provider_mode": self.status,
-            },
-        )
-
-        return contract, True, None
-
-
-class WorkersAIProvider(
+class CloudflareProvider(
     BaseAIProvider
 ):
     """Tertiary failover provider."""
@@ -649,7 +554,7 @@ class WorkersAIProvider(
 
         super().__init__(
             provider_name=(
-                AIProviderType.WORKERS_AI.value
+                AIProviderType.CLOUDFLARE.value
             ),
             model_name=(
                 "@cf/meta/llama-3.1-8b-instruct"
@@ -677,11 +582,11 @@ class WorkersAIProvider(
             return (
                 None,
                 False,
-                "Simulated Workers AI endpoint unavailable.",
+                "Simulated Cloudflare endpoint unavailable.",
             )
 
         response_id = (
-            f"RESP-WAI-"
+            f"RESP-CF-"
             f"{uuid.uuid4().hex[:10].upper()}"
         )
 
@@ -703,13 +608,13 @@ class WorkersAIProvider(
                 routing_decision.query_type.value
             ),
             headline=(
-                "Workers AI Tertiary "
+                "Cloudflare Tertiary "
                 "Failover Report"
             ),
             verified_facts=facts_list,
             explanation=(
                 "Processed via tertiary "
-                "Cloudflare Workers AI tier."
+                "Cloudflare inference tier."
             ),
             recommendations=[],
             data_limitations=[],
@@ -724,7 +629,7 @@ class WorkersAIProvider(
                 "total_tokens": 140,
             },
             provenance={
-                "failover_tier": "TERTIARY",
+                "failover_tier": "SECONDARY",
                 "provider_mode": self.status,
             },
         )
@@ -738,8 +643,7 @@ class AIGateway:
     def __init__(
         self,
         simulate_gemini_failure: bool = False,
-        simulate_groq_failure: bool = False,
-        simulate_workers_failure: bool = False,
+        simulate_cloudflare_failure: bool = False,
     ) -> None:
         self.flash_lite_provider = (
             GeminiFlashLiteProvider(
@@ -756,15 +660,10 @@ class AIGateway:
                 )
             )
         )
-
-        self.groq_provider = GroqProvider(
-            simulate_failure=simulate_groq_failure
-        )
-
-        self.workers_ai_provider = (
-            WorkersAIProvider(
+        self.cloudflare_provider = (
+            CloudflareProvider(
                 simulate_failure=(
-                    simulate_workers_failure
+                    simulate_cloudflare_failure
                 )
             )
         )
@@ -792,11 +691,7 @@ class AIGateway:
                 350,
                 150,
             ),
-            AIProviderType.GROQ.value: (
-                220,
-                100,
-            ),
-            AIProviderType.WORKERS_AI.value: (
+            AIProviderType.CLOUDFLARE.value: (
                 180,
                 80,
             ),
@@ -920,21 +815,12 @@ class AIGateway:
             BaseAIProvider
         ] = [
             primary_provider,
-            self.groq_provider,
-            self.workers_ai_provider,
+            self.cloudflare_provider,
         ]
 
         # --------------------------------------------------------
         # 3. Persistent quota requirement
         # --------------------------------------------------------
-        #
-        # A real external AI request must have a DB-backed quota
-        # reservation. We deliberately refuse to make an external
-        # provider call without the persistent enforcement context.
-        #
-        # Offline test doubles are allowed to execute without DB
-        # reservation because they do not generate external cost.
-        #
         if db is None and any(
             provider.status
             == ProviderStatus.LIVE.value
@@ -965,12 +851,6 @@ class AIGateway:
         # --------------------------------------------------------
         # 3B. Quota enforcement BEFORE provider selection
         # --------------------------------------------------------
-        #
-        # Test doubles do not incur external cost, but they must
-        # still respect an exhausted tenant AI policy. This keeps
-        # production and test behavior aligned without requiring
-        # live API credentials in the test suite.
-        #
         quota_probe_provider = primary_provider
 
         (
@@ -1067,11 +947,11 @@ class AIGateway:
                 == ProviderStatus.LIVE.value
             ):
                 if db is None:
-                    # Defensive guard; already handled above.
                     continue
 
-                estimated_input_tokens, (
-                    estimated_output_tokens
+                (
+                    estimated_input_tokens,
+                    estimated_output_tokens,
                 ) = self._estimated_provider_usage(
                     provider
                 )
@@ -1165,6 +1045,8 @@ class AIGateway:
             is_success: bool
             provider_error: Optional[str]
 
+            settled_cost_usd = 0.0
+
             candidate_resp, is_success, provider_error = (
                 provider.generate(
                     fact_pack,
@@ -1189,11 +1071,8 @@ class AIGateway:
                             ),
                             db=db,
                         )
-                        if db is None:
-                            raise RuntimeError(
-                                "Reservation release completed without a database session."
-                            )
-                        db.commit()
+                        if db is not None:
+                            db.commit()
                     except Exception:
                         if db is not None:
                             db.rollback()
@@ -1248,8 +1127,10 @@ class AIGateway:
                     is_fallback=(
                         candidate_resp.is_fallback
                     ),
+                    estimated_cost_usd=0.0,
                 )
 
+                candidate_resp.answer_source = "AI_ESCALATION"
                 return candidate_resp
 
             # ----------------------------------------------------
@@ -1279,11 +1160,8 @@ class AIGateway:
                             reason="GROUNDING_REJECTED",
                             db=db,
                         )
-                        if db is None:
-                            raise RuntimeError(
-                                "Reservation release completed without a database session."
-                            )
-                        db.commit()
+                        if db is not None:
+                            db.commit()
                     except Exception:
                         if db is not None:
                             db.rollback()
@@ -1338,18 +1216,16 @@ class AIGateway:
                         "quota_reservation_id"
                     ] = reservation_id
 
-                    candidate_resp.provenance[
-                        "settled_cost_usd"
-                    ] = (
+                    settled_cost_usd = float(
                         usage_record.estimated_cost_usd
                     )
+                    candidate_resp.provenance[
+                        "settled_cost_usd"
+                    ] = settled_cost_usd
 
                     db.commit()
 
                 else:
-                    # Defensive branch for future non-reserved
-                    # internal billable providers. No external
-                    # live provider should reach this branch.
                     if (
                         provider.status
                         == ProviderStatus.LIVE.value
@@ -1380,8 +1256,6 @@ class AIGateway:
                     provider.provider_name,
                 )
 
-                # We must NOT return a live provider response
-                # when its usage could not be persisted/accounted.
                 return (
                     self._generate_deterministic_fallback(
                         fact_pack,
@@ -1403,6 +1277,7 @@ class AIGateway:
                     )
                 )
 
+            candidate_resp.answer_source = "AI_ESCALATION"
             return candidate_resp
 
         # --------------------------------------------------------

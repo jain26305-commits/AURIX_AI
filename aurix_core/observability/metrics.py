@@ -34,6 +34,15 @@ class MetricsSnapshot(BaseModel):
     actions_failed_total: int = 0
     actions_compensated_total: int = 0
 
+    deterministic_queries_total: int = 0
+    deterministic_query_success_total: int = 0
+    ai_escalations_total: int = 0
+    tool_calls_total: int = 0
+    tool_failures_total: int = 0
+    agent_runs_total: int = 0
+    agent_failures_total: int = 0
+    decisions_total: int = 0
+
 
 class MetricsRegistry:
     """Thread-safe global metrics registry tracking operational and AI cost telemetry."""
@@ -59,8 +68,16 @@ class MetricsRegistry:
                 cls._metrics.run_failures_total += 1
 
     @classmethod
-    def record_ai_usage(cls, input_tokens: int, output_tokens: int, provider: str, is_fallback: bool = False) -> None:
-        """Tracks AI gateway token consumption and estimated costs based on standard pricing models."""
+    def record_ai_usage(
+        cls,
+        input_tokens: int,
+        output_tokens: int,
+        provider: str,
+        is_fallback: bool = False,
+        estimated_cost_usd: float = 0.0,
+    ) -> None:
+        """Tracks AI usage using the authoritative settled cost when available."""
+        _ = provider
         with cls._lock:
             cls._metrics.ai_requests_total += 1
             cls._metrics.ai_tokens_input_total += input_tokens
@@ -68,7 +85,12 @@ class MetricsRegistry:
             if is_fallback:
                 cls._metrics.ai_fallbacks_total += 1
 
-            cost = (input_tokens / 1_000_000 * 0.15) + (output_tokens / 1_000_000 * 0.60)
+            cost = estimated_cost_usd
+            if cost <= 0:
+                cost = (
+                    input_tokens / 1_000_000 * 0.15
+                    + output_tokens / 1_000_000 * 0.60
+                )
             cls._metrics.ai_estimated_cost_usd += cost
 
     @classmethod
@@ -102,6 +124,39 @@ class MetricsRegistry:
                 cls._metrics.actions_failed_total += 1
             elif state_upper == "COMPENSATION_REQUIRED":
                 cls._metrics.actions_compensated_total += 1
+
+    @classmethod
+    def record_query_resolution(cls, deterministic: bool, success: bool) -> None:
+        """Records whether a query was resolved by AURIX or escalated to AI."""
+        with cls._lock:
+            if deterministic:
+                cls._metrics.deterministic_queries_total += 1
+                if success:
+                    cls._metrics.deterministic_query_success_total += 1
+            else:
+                cls._metrics.ai_escalations_total += 1
+
+    @classmethod
+    def record_tool_call(cls, success: bool) -> None:
+        """Records deterministic tool-call outcomes."""
+        with cls._lock:
+            cls._metrics.tool_calls_total += 1
+            if not success:
+                cls._metrics.tool_failures_total += 1
+
+    @classmethod
+    def record_agent_run(cls, success: bool) -> None:
+        """Records supervised agent-run outcomes."""
+        with cls._lock:
+            cls._metrics.agent_runs_total += 1
+            if not success:
+                cls._metrics.agent_failures_total += 1
+
+    @classmethod
+    def record_decision(cls) -> None:
+        """Records a persisted Phase 16 decision record."""
+        with cls._lock:
+            cls._metrics.decisions_total += 1
 
     @classmethod
     def get_snapshot(cls) -> MetricsSnapshot:

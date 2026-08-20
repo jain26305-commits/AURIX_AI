@@ -17,13 +17,17 @@ from aurix_core.database.models import (
     intelligence,
     inventory_intelligence,
     logistics_intelligence,
+    network,
     network_intelligence,
     quota,
     supply_chain,
     supply_intelligence,
 )
+from aurix_core.database.engine import Base
+from aurix_core.phase16 import models as phase16
 
 __all__ = [
+    "Base",
     "economics",
     "events",
     "forecasting",
@@ -31,8 +35,10 @@ __all__ = [
     "intelligence",
     "inventory_intelligence",
     "logistics_intelligence",
+    "network",
     "network_intelligence",
     "quota",
     "supply_chain",
     "supply_intelligence",
+    "phase16",
 ]

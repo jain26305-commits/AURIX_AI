@@ -2,6 +2,7 @@
 
 import math
 import time
+import threading
 from typing import Callable, Dict, Optional, Tuple
 from fastapi import Depends, HTTPException, status
 
@@ -44,8 +45,10 @@ class TokenBucket:
 class InMemoryRateLimiter:
     """Manages rate-limiting token buckets isolated by tenant and capability domain."""
 
-    def __init__(self) -> None:
+    def __init__(self, max_buckets: int = 10000) -> None:
         self._buckets: Dict[str, TokenBucket] = {}
+        self._max_buckets = max_buckets
+        self._lock = threading.RLock()
 
     def get_or_create_bucket(
         self,
@@ -53,13 +56,22 @@ class InMemoryRateLimiter:
         requests_per_minute: int,
     ) -> TokenBucket:
         """Retrieves or instantiates a token bucket with configured per-minute limits."""
-        if key not in self._buckets:
-            refill_rate = requests_per_minute / 60.0
-            self._buckets[key] = TokenBucket(
-                capacity=float(requests_per_minute),
-                refill_rate_per_second=refill_rate,
-            )
-        return self._buckets[key]
+        with self._lock:
+            bucket = self._buckets.get(key)
+            if bucket is None:
+                if len(self._buckets) >= self._max_buckets:
+                    oldest_key = min(
+                        self._buckets,
+                        key=lambda candidate: self._buckets[candidate].last_refill_time,
+                    )
+                    self._buckets.pop(oldest_key, None)
+                refill_rate = requests_per_minute / 60.0
+                bucket = TokenBucket(
+                    capacity=float(requests_per_minute),
+                    refill_rate_per_second=refill_rate,
+                )
+                self._buckets[key] = bucket
+            return bucket
 
     def check_rate_limit(
         self,
@@ -69,8 +81,9 @@ class InMemoryRateLimiter:
     ) -> Tuple[bool, float]:
         """Evaluates rate limit for a specific tenant and operational category."""
         key = f"{tenant_id}:{category}"
-        bucket = self.get_or_create_bucket(key, requests_per_minute)
-        return bucket.consume(1.0)
+        with self._lock:
+            bucket = self.get_or_create_bucket(key, requests_per_minute)
+            return bucket.consume(1.0)
 
 
 # Global singleton in-memory rate limiter instance

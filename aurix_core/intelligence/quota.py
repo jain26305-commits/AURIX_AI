@@ -57,13 +57,6 @@ AI_PRICING_REGISTRY: Dict[str, AIProviderPricing] = {
         output_price_per_1m=0.60,
         status="LIVE",
     ),
-    "GROQ": AIProviderPricing(
-        provider="GROQ",
-        model="llama-3.1-70b",
-        input_price_per_1m=0.59,
-        output_price_per_1m=0.79,
-        status="LIVE",
-    ),
     "CLOUDFLARE": AIProviderPricing(
         provider="CLOUDFLARE",
         model="llama-3-8b",

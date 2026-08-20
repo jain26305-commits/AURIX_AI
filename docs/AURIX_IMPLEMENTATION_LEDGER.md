@@ -1,87 +1,182 @@
-# 🏛️ AURIX ENTERPRISE PLATFORM — MASTER IMPLEMENTATION LEDGER
-## Master Architectural Register, Verification Matrix & Production Status
+# AURIX ENTERPRISE PLATFORM — MASTER ARCHITECTURE ROADMAP
 
----
+## 1. Executive Milestone Lifecycle
 
-## 📌 Executive Architecture & Phase Status Register
+| Category | Scope | Definition & Operating Rule |
+| :--- | :--- | :--- |
+| **COMPLETED** | Phases 0–15 | Foundational, analytical, integration, event-driven, decision-execution, and hardening engines are locked and regression-tested. |
+| **CURRENT** | Master Phase 16 — Enterprise Backend Hardening | Consolidated operational, procurement, planning, fulfillment, case-control, governance, provenance, and agent-orchestration capabilities, followed by the final enterprise-readiness gate. |
+| **NEXT** | Customer Website / Dashboard | Decoupled customer-facing frontend consuming authenticated AURIX APIs only. |
+| **DEFERRED** | Heavy distributed infrastructure | Kafka/RabbitMQ, distributed tracing collectors, external object-storage expansion, and multi-service decomposition remain deferred until scale requires them. |
+| **DEFERRED** | ESG / carbon intelligence | The former Phase 19 ESG scope is intentionally deferred and is not part of the current implementation freeze. |
 
-| Phase | Domain / Subsystem | Architectural Scope | Status | Tests | Strict Typing (`mypy`) | Style (`flake8`) |
-| :---: | :--- | :--- | :---: | :---: | :---: | :---: |
-| **0** | **Foundation** | Config, DB Engine, Base Models & Sessions | **LOCKED 🔒** | 15 | Passed 🟢 | Passed 🟢 |
-| **1** | **Data Engine** | Canonical Schema, Schemas & Validation | **LOCKED 🔒** | 20 | Passed 🟢 | Passed 🟢 |
-| **2** | **Ingestion** | Quality Profiling, Ingestion Pipeline & Cleaning | **LOCKED 🔒** | 25 | Passed 🟢 | Passed 🟢 |
-| **3** | **Analytics** | Demand Classification & Multi-Model Forecasting | **LOCKED 🔒** | 20 | Passed 🟢 | Passed 🟢 |
-| **4** | **Analytics** | Safety Stock, Multi-Echelon Reorder Points | **LOCKED 🔒** | 15 | Passed 🟢 | Passed 🟢 |
-| **5** | **Analytics** | Supplier Selection, Scoring & Risk Profiling | **LOCKED 🔒** | 15 | Passed 🟢 | Passed 🟢 |
-| **6** | **Analytics** | Logistics ETA, Delay Prediction & Tracking | **LOCKED 🔒** | 15 | Passed 🟢 | Passed 🟢 |
-| **7** | **Analytics** | Network Topology, Bottlenecks & Rebalancing | **LOCKED 🔒** | 15 | Passed 🟢 | Passed 🟢 |
-| **8** | **Analytics** | Working Capital, TCO & What-If Simulations | **LOCKED 🔒** | 20 | Passed 🟢 | Passed 🟢 |
-| **9** | **Autonomous AI**| Autonomous Graph, Copilot Gateway & Snapshots | **LOCKED 🔒** | 25 | Passed 🟢 | Passed 🟢 |
-| **10**| **API Platform** | FastAPI Routers, JWT Auth, RBAC & Run Manager | **LOCKED 🔒** | 25 | Passed 🟢 | Passed 🟢 |
-| **11**| **Onboarding** | Automated Customer Data Onboarding & Mapping | **LOCKED 🔒** | 15 | Passed 🟢 | Passed 🟢 |
-| **12**| **Integrations**| Universal Connectors (ERP, WMS, SFTP, Webhooks) | **LOCKED 🔒** | 20 | Passed 🟢 | Passed 🟢 |
-| **13**| **Events** | Real-Time Idempotency & Event Router | **LOCKED 🔒** | 20 | Passed 🟢 | Passed 🟢 |
-| **14**| **Execution** | Controlled Decision Execution & Policy Gating | **LOCKED 🔒** | 7 | Passed 🟢 | Passed 🟢 |
-| **15**| **Hardening** | Production Hardening, MLOps, Telemetry & DR | **LOCKED 🔒** | 13 | Passed 🟢 | Passed 🟢 |
-| **REC**| **Reconciliation** | AI Quota Gate, Zero-Fabrication, Persistence | **LOCKED 🔒** | 12 | Passed 🟢 | Passed 🟢 |
-| **ALL**| **Total Platform** | **End-to-End Enterprise Platform Ecosystem** | **LOCKED 🔒** | **247** | **0 Errors 🟢** | **0 Violations 🟢** |
+## 2. Completed Milestones — Phases 0–15 🔒
 
----
+- Phase 0 — Foundation & Configuration
+- Phase 1 — Canonical Data Schemas
+- Phase 2 — Ingestion & Profiling
+- Phase 3 — Demand Classification & Forecasting
+- Phase 4 — Inventory Intelligence
+- Phase 5 — Supplier & Procurement Intelligence
+- Phase 6 — Logistics & Delay Tracking
+- Phase 7 — Network Topology & Rebalancing
+- Phase 8 — Working Capital & Simulation
+- Phase 9 — Intelligence, Copilot & Deterministic Grounding
+- Phase 10 — API Platform, Authentication, Tenant Isolation & RBAC
+- Phase 11 — Customer Data Onboarding
+- Phase 12 — Universal Integration Hub
+- Phase 13 — Real-Time Event Intelligence
+- Phase 14 — Controlled Decision Execution
+- Phase 15 — Production Hardening, MLOps & Disaster-Recovery Foundations
 
-## 🛠️ Final Backend Integrity Reconciliation Summary
+## 3. Master Phase 16 — Operational Intelligence & Enterprise Backend
 
-### 1. Tenant AI Quota & Budget Enforcement Engine
-* **Engine:** `aurix_core/intelligence/quota.py` (`AIQuotaManager`)
-* **Key Mechanics:**
-  * **Pre-Call Gating:** Evaluates daily and monthly spend and token ceilings before calling external LLM providers.
-  * **Deterministic Fallback:** Automatically diverts requests to verified deterministic rule engines upon quota exhaustion, avoiding HTTP 500 runtime errors.
-  * **Concurrency Protection:** Wraps in-memory accounting ledgers with `threading.Lock()` to prevent race conditions during high-volume query bursts.
-  * **Soft Warning Threshold:** Triggers actionable notifications when tenant usage crosses configurable budget thresholds (default: 80%).
+Master Phase 16 consolidates the former Phase 16–20 operational scope into one controlled backend milestone.
 
-### 2. Zero-Fabrication Connector Transformations
-* **Modules:** `aurix_core/integrations/adapters/wms_generic.py`, `aurix_core/integrations/adapters/erp_odoo.py`
-* **Key Mechanics:**
-  * **Explicit Nullability:** Missing quantities, unit prices, bin locations, and timestamps propagate as `None` rather than synthetic `0.0`, `"STAGE"`, or default timestamps.
-  * **Safe Parsing:** `_safe_parse_float` and `_safe_parse_iso_date` parse authentic numbers and ISO-8601 strings without fabricating data.
+### Procurement & Supplier Lifecycle
+- Supplier qualification and performance
+- RFQ / quotation / award workflows
+- Purchase-order lifecycle
+- Supplier acknowledgement and commitment management
+- PO revisions and commitment revisions
+- ASN and goods receipt
+- Invoice, credit-note, and debit-note handling
+- Cumulative three-way matching
 
-### 3. Durable Canonical Ingestion Pipeline
-* **Engine:** `aurix_core/data_foundation/ingestion_service.py`
-* **Key Mechanics:**
-  * **Timezone-Aware Timestamps:** Replaced deprecated `datetime.utcnow()` with `datetime.now(timezone.utc)` across all lifecycle markers.
-  * **Deterministic Hashing:** Implemented sorted column reindexing prior to JSON serialization for SHA-256 duplicate detection.
-  * **Transactional Safety:** Enforced explicit `db.rollback()` on mapping errors to prevent corrupt partial writes.
+### Planning & Fulfillment
+- BOM management
+- Multi-level MRP
+- Capacity checks
+- ATP
+- CTP
+- Transaction-safe reservations
+- Fulfillment allocation
+- Scenario creation and scenario comparison
 
-### 4. Controlled Action Execution & Verification
-* **Modules:** `aurix_core/actions/adapters.py`, `aurix_core/actions/executor.py`
-* **Key Mechanics:**
-  * **Transmission Boundaries:** Set adapter responses to `VERIFICATION_PENDING` by default, strictly decoupling transmission acceptance from final verification.
-  * **Post-Approval Immutability:** Uses SHA-256 action hashing (`approval_hash`) to automatically transition modified actions to `APPROVAL_INVALIDATED`.
-  * **Idempotency Deduplication:** Checks active idempotency keys prior to action creation to prevent duplicate operational writes.
+### Control Tower & Decision Management
+- Event → case workflows
+- Case lifecycle and SLA ownership
+- Impact propagation
+- Supervisor/specialist orchestration
+- Economics and working-capital intelligence
+- Decision records and outcome/value provenance
+- Deterministic-first tool execution
 
-### 5. Durable Event Processing & Dead-Letter Quarantine
-* **Engine:** `aurix_core/events/processor.py`
-* **Key Mechanics:**
-  * **Thread-Safe Idempotency:** Guarded `_PROCESSED_EVENTS_CACHE` and `_QUARANTINED_STORE` with `threading.Lock()`.
-  * **Dead-Letter Inspection:** Exposes `get_quarantined_events` and `get_active_alerts` for tenant auditability.
+### AI Architecture
+AURIX remains deterministic-first:
 
-### 6. Production Security & Lifespan Modernization
-* **Modules:** `aurix_core/config/settings.py`, `aurix_api/app.py`
-* **Key Mechanics:**
-  * **Fail-Fast Validation:** Binds startup to `validate_production_security`, rejecting default dev secrets and active debug mode in production.
-  * **Modern Lifespan:** Replaced deprecated `@app.on_event` handlers with FastAPI's `asynccontextmanager` lifespan interface.
+USER / EVENT
+→ Query Router
+→ AURIX Tool / Engine when deterministically answerable
+→ otherwise FactPack
+→ AI Gateway
+→ Gemini / Cloudflare
+→ grounded recommendation
 
----
+Groq is not supported.
 
-## 🔍 Master Quality Gate & Regression Results
+### Governance
+All external side effects remain subject to:
 
-* **Total Test Suite:** 247 Tests Executed / 247 Tests Passed (100% Pass Rate).
-* **Static Type Checking (`mypy --strict`):** 0 errors across 221 source files.
-* **Code Style Compliance (`flake8`):** 0 PEP8 violations across all packages.
-* **Empirical Benchmarks:** $p_{95} \le 2.85\text{ ms}$ for health probes, $p_{95} \le 1.95\text{ ms}$ for action preflight policies, $p_{95} \le 2.40\text{ ms}$ for event routing.
+Query / Event
+→ Governance
+→ Phase 14 Action Executor
+→ Execution
+→ Verification
+→ Outcome
 
----
+Agents never bypass the governed execution authority.
 
-## 🔒 Final Platform Certification
+## 4. Enterprise Backend Readiness Gate 🔐
 
-* **System Status:** **PRODUCTION READY & HARDENED (v15.2-RECONCILED) 🔒**
-* **Certification Summary:** The AURIX Enterprise Platform has completed all core architecture, governance, integration, and backend reconciliation milestones.
+Before the backend is frozen for frontend development, verify:
+
+1. Production security and tenant isolation
+2. Authentication / RBAC / least-privilege enforcement
+3. API validation, structured errors, request correlation and rate limiting
+4. PostgreSQL migration integrity and rollback safety
+5. RLS certification
+6. Deterministic/AI routing correctness
+7. AI quota and cost accounting
+8. Integration authentication, webhook validation and idempotency
+9. File-ingestion safety limits and quarantine behavior
+10. Background-run heartbeat / stale-run recovery
+11. Structured observability and operational metrics
+12. Docker/CI/CD certification
+13. Backup and restore procedure
+14. Repository cleanliness and secret exclusion
+
+## 5. Customer Website / Dashboard — Next Major Layer
+
+The backend remains independent of the frontend.
+
+Future structure:
+
+```text
+AURIX/
+├── aurix_core/
+├── aurix_api/
+├── alembic/
+├── tests/
+└── frontend/
+```
+
+The frontend must consume authenticated AURIX APIs and must never access:
+
+- PostgreSQL directly
+- model artifacts directly
+- connector credentials directly
+- internal tool execution interfaces directly
+
+Core future views:
+
+- Executive Control Tower
+- AI Copilot
+- Data Onboarding
+- Procurement / PO Center
+- Inventory / Forecasting
+- Supplier & Logistics Intelligence
+- Scenario / Decision Center
+- Action Execution Center
+- Integration Monitor
+- Tenant Administration
+
+## 6. Deferred Scale Infrastructure ⏳
+
+| Deferred Component | Current Lightweight Implementation | Trigger |
+| :--- | :--- | :--- |
+| Distributed Message Bus | In-process event dispatcher with persisted event state | Sustained event volume requires horizontal event processing |
+| Distributed Task Queue | Background analytical runs with heartbeat/reconciliation | Long-running jobs or multi-worker scheduling requires durable queue infrastructure |
+| Distributed Tracing Collector | Correlation IDs and structured logs | Multi-service decomposition |
+| External Object Storage Expansion | Existing artifact-storage abstraction | Multi-region or materially larger model-artifact footprint |
+
+## 7. System Invariants & Non-Negotiable Rules 🛡️
+
+1. **Deterministic Authority:** AI layers synthesize and explain; deterministic engines calculate.
+2. **Zero-Fabrication:** Missing source data remains unavailable/unknown rather than being silently invented.
+3. **Strict Multi-Tenancy:** Tenant isolation applies to storage, memory, caches, jobs, tools, and execution.
+4. **Evidence-Based Readiness:** Capabilities are available only when actual prerequisites are satisfied.
+5. **Governed Execution:** All external side effects terminate at the Phase 14 Action Executor.
+6. **Traceable Decisions:** Recommendations must retain sufficient FactPack, tool, decision, action, and outcome provenance.
+7. **Provider Discipline:** Gemini and Cloudflare are the only supported external AI providers.
+8. **Production Database Discipline:** Production uses PostgreSQL; SQLite remains a local/test convenience only.
+
+to clear cache
+Get-ChildItem -Path . -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+Where-Object {
+    $_.Name -in @("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")
+} |
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+Get-ChildItem -Path . -Recurse -File -Include *.pyc,*.pyo -Force -ErrorAction SilentlyContinue |
+Remove-Item -Force -ErrorAction SilentlyContinue
+
+to clear cache
+Get-ChildItem -Path . -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+Where-Object {
+    $_.Name -in @("__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache")
+} |
+Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+
+Get-ChildItem -Path . -Recurse -File -Include *.pyc,*.pyo -Force -ErrorAction SilentlyContinue |
+Remove-Item -Force -ErrorAction SilentlyContinue

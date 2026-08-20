@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from aurix_api.middleware.correlation import CorrelationIdMiddleware
+from aurix_api.middleware.security_headers import SecurityHeadersMiddleware
 from aurix_api.middleware.error_handler import register_error_handlers
 from aurix_api.routers import (
     actions,
@@ -22,6 +23,7 @@ from aurix_api.routers import (
     integrations,
     intelligence,
     onboarding,
+    phase16,
     runs,
 )
 from aurix_core.config.settings import settings
@@ -110,10 +112,13 @@ def create_app() -> FastAPI:
     # 2. Correlation / request tracing
     app.add_middleware(CorrelationIdMiddleware)
 
-    # 3. Centralized exception mapping
+    # 3. HTTP security headers
+    app.add_middleware(SecurityHeadersMiddleware)
+
+    # 4. Centralized exception mapping
     register_error_handlers(app)
 
-    # 4. Domain routers
+    # 5. Domain routers
     app.include_router(health.router)
     app.include_router(data.router)
     app.include_router(onboarding.router)
@@ -125,6 +130,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router)
     app.include_router(intelligence.router)
     app.include_router(ai.router)
+    app.include_router(phase16.router)
 
     return app
 

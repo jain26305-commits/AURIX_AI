@@ -48,8 +48,8 @@ def readiness_probe(db: Session = Depends(get_db)) -> ApiResponse[Dict[str, Any]
     db_status = "healthy"
     try:
         db.execute(text("SELECT 1"))
-    except Exception as e:
-        db_status = f"unhealthy: {str(e)}"
+    except Exception:
+        db_status = "unhealthy"
 
     latency_ms = round((time.time() - start_time) * 1000, 2)
     overall_status = ResponseStatus.SUCCESS if "unhealthy" not in db_status else ResponseStatus.FAILED

@@ -1,10 +1,13 @@
 """Request and Correlation ID middleware for end-to-end distributed tracing in Phase 10."""
 
+import time
 import uuid
 from typing import Awaitable, Callable
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
+
+from aurix_core.observability.metrics import MetricsRegistry
 
 CORRELATION_HEADER = "X-Request-ID"
 CORRELATION_HEADER_ALT = "X-Correlation-ID"
@@ -29,9 +32,23 @@ class CorrelationIdMiddleware(BaseHTTPMiddleware):
         # 2. Attach to request state for downstream handlers, logging, and error envelopes
         request.state.request_id = request_id
 
-        # 3. Process the request through downstream dependencies and routers
-        response: Response = await call_next(request)
+        # 3. Process the request through downstream dependencies and routers.
+        started = time.perf_counter()
+        try:
+            response = await call_next(request)
+        except Exception:
+            MetricsRegistry.increment_api_request(
+                is_error=True,
+                latency_seconds=time.perf_counter() - started,
+            )
+            raise
 
-        # 4. Attach request ID to response header for client-side correlation
+        # 4. Record request telemetry without changing response behavior.
+        MetricsRegistry.increment_api_request(
+            is_error=response.status_code >= 500,
+            latency_seconds=time.perf_counter() - started,
+        )
+
+        # 5. Attach request ID to response header for client-side correlation.
         response.headers[CORRELATION_HEADER] = request_id
         return response

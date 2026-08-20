@@ -19,7 +19,10 @@ class StructuredJsonFormatter(logging.Formatter):
             "level": record.levelname,
             "logger": record.name,
             "message": record.getMessage(),
-            "environment": os.getenv("ENVIRONMENT", "development"),
+            "environment": os.getenv(
+                "AURIX_ENVIRONMENT",
+                os.getenv("ENVIRONMENT", "development"),
+            ),
         }
 
         # Extract contextual attributes if present in log record or extras

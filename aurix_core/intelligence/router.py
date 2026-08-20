@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pydantic import BaseModel, Field
 
 from aurix_core.intelligence.discovery import CapabilityStatus, Domain
+from aurix_core.tools.registry import ToolRegistry
 
 
 class QueryType(str, Enum):
@@ -50,6 +51,7 @@ class RoutingDecision(BaseModel):
     query_type: QueryType
     domain: Optional[Domain] = None
     target_capability: Optional[str] = None
+    target_tool: Optional[str] = None
     confidence: RouterConfidence
     requires_ai: bool = False
     fast_path_eligible: bool = False
@@ -89,7 +91,7 @@ class BusinessRouter:
             "network", "bottleneck", "node", "facility", "single source", "dc", "warehouse", "bullwhip"
         ],
         Domain.DECISION: ["rebalance", "transfer", "lateral move", "rebalancing candidate"],
-        Domain.ECONOMICS: ["working capital", "tco", "holding cost", "financial exposure", "spend", "cost impact"],
+        Domain.ECONOMICS: ["working capital", "tco", "holding cost", "financial exposure", "spend", "cost impact", "margin", "cost to serve"],
     }
 
     DEFAULT_CAPABILITY_MAP: Dict[Domain, str] = {
@@ -172,7 +174,7 @@ class BusinessRouter:
                 confidence=RouterConfidence.HIGH,
                 requires_ai=False,
                 capability_available=False,
-                rejection_reason="Direct operational ERP/WMS write operations are not supported in Phase 9.",
+                rejection_reason="Direct operational ERP/WMS writes are governed by Phase 14 action controls and are not executed by the query router.",
             )
 
         # 3. Entity Resolution Hierarchy
@@ -241,8 +243,32 @@ class BusinessRouter:
                 confidence = RouterConfidence.LOW
                 requires_ai = False
 
-        # 6. Capability Availability Check
-        target_cap = cls.DEFAULT_CAPABILITY_MAP.get(detected_domain) if detected_domain else None
+        # 6. Capability selection: prefer the most specific deterministic
+        # capability rather than a broad domain default.
+        target_cap: Optional[str] = None
+        if any(term in clean_query for term in ("ctp", "capable to promise", "can we promise", "promise by")):
+            target_cap = "PHASE16_CTP"
+        elif any(term in clean_query for term in ("atp", "available to promise")):
+            target_cap = "PHASE16_ATP"
+        elif any(term in clean_query for term in ("mrp", "material requirement", "material requirements")):
+            target_cap = "PHASE16_MRP"
+        elif any(term in clean_query for term in ("capacity", "bottleneck capacity")):
+            target_cap = "PHASE16_CAPACITY"
+        elif any(term in clean_query for term in ("compare scenarios", "scenario comparison")):
+            target_cap = "PHASE16_SCENARIO_COMPARE"
+        elif query_type == QueryType.SIMULATE and any(term in clean_query for term in ("scenario", "simulate", "what if")):
+            target_cap = "PHASE16_SCENARIO"
+        elif detected_domain == Domain.INVENTORY:
+            target_cap = (
+                "SAFETY_STOCK_ROP"
+                if any(term in clean_query for term in (
+                    "safety stock", "reorder point", "reorder", "rop"
+                ))
+                else "INVENTORY_POSITION_RISK"
+            )
+        else:
+            target_cap = cls.DEFAULT_CAPABILITY_MAP.get(detected_domain) if detected_domain else None
+
         capability_available = True
         rejection_reason = None
 
@@ -271,11 +297,29 @@ class BusinessRouter:
             else None
         )
 
+        # Deterministic-first routing: a query is AI-free only when a
+        # registered AURIX tool can actually execute the requested capability.
+        resolved_tool = ToolRegistry.resolve_for_capability(target_cap) if target_cap else None
+        deterministic_ready = (
+            query_type in {QueryType.READ, QueryType.ANALYZE, QueryType.COMPARE, QueryType.SIMULATE}
+            and resolved_tool is not None
+            and capability_available
+            and (resolved_entity_id is not None or not getattr(resolved_tool, "requires_entity", True))
+            and not getattr(resolved_tool, "side_effect", False)
+        )
+        if deterministic_ready:
+            fast_path = True
+            requires_ai = False
+        elif query_type in {QueryType.READ, QueryType.ANALYZE, QueryType.COMPARE, QueryType.SIMULATE}:
+            fast_path = False
+            requires_ai = True
+
         return RoutingDecision(
             query=query,
             query_type=query_type,
             domain=detected_domain,
             target_capability=target_cap,
+            target_tool=resolved_tool.name if resolved_tool else None,
             confidence=confidence,
             requires_ai=requires_ai,
             fast_path_eligible=fast_path,
