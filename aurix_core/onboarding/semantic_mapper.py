@@ -18,12 +18,21 @@ CANONICAL_ALIASES: Dict[str, Set[str]] = {
         "partnumber", "partno", "articleid", "articleno", "code",
     },
     "date": {
-        "date", "transactiondate", "orderdate", "period", "month", "week",
-        "day", "timestamp", "ds", "postingdate", "invoicedate", "salesdate",
+        "date", "transactiondate", "period", "month", "week",
+        "day", "timestamp", "ds", "postingdate",
     },
     "quantity": {
         "quantity", "qty", "demand", "sales", "salesqty", "units", "volume",
         "qtysold", "actualdemand", "orderedqty", "demandqty", "amount",
+    },
+    "location_id": {
+        "locationid", "warehouseid", "facilityid", "nodeid", "plantid",
+    },
+    "on_hand": {
+        "onhand", "onhandqty", "onhandunits", "availableqty", "stockonhand",
+    },
+    "on_order": {
+        "onorder", "onorderqty", "onorderunits", "orderedunits",
     },
     "inventory_level": {
         "inventory", "inventorylevel", "stock", "stocklevel", "onhand",
@@ -63,6 +72,127 @@ CANONICAL_ALIASES: Dict[str, Set[str]] = {
         "destinationfacility", "destination", "tolocation", "destwarehouse",
         "destfacility", "destinationlocation", "arrivalfacility",
     },
+
+    "customer_id": {
+        "customerid", "customer", "customercode", "accountid",
+    },
+    "customer_name": {
+        "customername", "accountname", "customerfullname",
+    },
+    "customer_tier": {
+        "customertier", "accounttier", "tier",
+    },
+    "country": {
+        "country", "countrycode", "nation", "countryname",
+    },
+    "segment": {
+        "segment", "customersegment", "marketsegment",
+    },
+    "account_status": {
+        "accountstatus", "customerstatus", "status",
+    },
+    "credit_limit": {
+        "creditlimit", "creditline",
+    },
+    "order_id": {
+        "orderid", "orderidentifier",
+    },
+    "order_number": {
+        "ordernumber", "orderno", "salesordernumber", "salesorderno",
+    },
+    "order_status": {
+        "orderstatus",
+    },
+    "channel": {
+        "channel", "saleschannel", "orderchannel",
+    },
+    "total_amount": {
+        "totalamount", "ordertotal", "invoicetotal", "grandtotal",
+    },
+    "discount_amount": {
+        "discountamount", "discount", "discountvalue",
+    },
+    "currency": {
+        "currency", "currencycode",
+    },
+    "order_date": {
+        "orderdate", "salesorderdate",
+    },
+    "purchase_order_id": {
+        "purchaseorderid", "poid", "purchaseorder", "po",
+    },
+    "required_date": {
+        "requireddate", "needbydate", "requesteddate",
+    },
+    "shipment_number": {
+        "shipmentnumber", "shipmentno", "deliverynumber",
+    },
+    "origin_location_id": {
+        "originlocationid", "originfacilityid", "fromlocationid",
+    },
+    "destination_location_id": {
+        "destinationlocationid", "destinationfacilityid", "tolocationid",
+    },
+    "carrier": {
+        "carrier", "carriername", "logisticsprovider",
+    },
+    "shipped_date": {
+        "shippeddate", "shipdate", "dispatchdate",
+    },
+    "estimated_arrival_date": {
+        "estimatedarrivaldate", "etadate", "eta",
+    },
+    "actual_arrival_date": {
+        "actualarrivaldate", "arrivaldate", "delivereddate",
+    },
+    "invoice_id": {
+        "invoiceid", "invoiceidentifier",
+    },
+    "invoice_number": {
+        "invoicenumber", "invoiceno",
+    },
+    "invoice_type": {
+        "invoicetype", "billingtype",
+    },
+    "entity_id": {
+        "entityid", "accountid", "counterpartyid",
+    },
+    "credit_note_amount": {
+        "creditnoteamount", "creditnote", "creditamount",
+    },
+    "tax_amount": {
+        "taxamount", "tax", "vatamount", "gstamount",
+    },
+    "issue_date": {
+        "issuedate", "invoicedate", "billingdate",
+    },
+    "due_date": {
+        "duedate", "paymentduedate",
+    },
+    "work_order_id": {
+        "workorderid", "woid",
+    },
+    "work_order_number": {
+        "workordernumber", "workorderno", "wonumber",
+    },
+    "plant_location_id": {
+        "plantlocationid", "plantid", "plantlocation",
+    },
+    "target_quantity": {
+        "targetquantity", "plannedquantity", "productiontarget",
+    },
+    "completed_quantity": {
+        "completedquantity", "producedquantity", "goodquantity",
+    },
+    "scrap_quantity": {
+        "scrapquantity", "scrapqty",
+    },
+    "work_center_id": {
+        "workcenterid", "workcenter",
+    },
+    "status": {
+        "status", "state", "lifecyclestatus",
+    },
 }
 
 # Type constraints required for valid canonical mapping
@@ -70,9 +200,13 @@ CANONICAL_TYPE_REQUIREMENTS: Dict[str, Set[str]] = {
     "sku_id": {"string", "identifier", "integer"},
     "date": {"date", "string"},
     "quantity": {"float", "integer", "numeric"},
+    "location_id": {"string", "identifier", "integer"},
+    "on_hand": {"float", "integer", "numeric"},
+    "on_order": {"float", "integer", "numeric"},
     "inventory_level": {"float", "integer", "numeric"},
     "reorder_point": {"float", "integer", "numeric"},
     "safety_stock": {"float", "integer", "numeric"},
+    "country": {"string", "identifier"},
     "supplier_id": {"string", "identifier", "integer"},
     "lead_time_days": {"float", "integer", "numeric"},
     "unit_cost": {"float", "integer", "numeric"},

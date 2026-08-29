@@ -72,3 +72,29 @@ Thumbs.db
 logs/
 artifacts/models/*
 !artifacts/models/.gitkeep
+
+# ============================================================
+# Node / Next.js
+# ============================================================
+node_modules/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ============================================================
+# AURIX generated release/audit artifacts
+# ============================================================
+AURIX_ARCHIVE/
+AURIX_STEP*/
+AURIX_*_AUDIT.txt
+AURIX_RELEASE_MANIFEST.json
+AURIX_COMPOSE_RESOLVED.yml
+
+STEP*_MASTER_BEFORE_*.ps1
+STEP*_MASTER_DAMAGED_*.ps1
+

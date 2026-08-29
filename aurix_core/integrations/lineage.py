@@ -1,4 +1,4 @@
-"""Source-to-intelligence data lineage tracker for Phase 12 Universal Integration Hub."""
+﻿"""Source-to-intelligence data lineage tracker for Phase 12 & Phase 19 Enterprise Data Fabric."""
 
 import logging
 import uuid
@@ -31,6 +31,7 @@ class SourceLineageTracker:
         canonical_record_id: str,
         sync_run_id: str,
         source_timestamp: Optional[str] = None,
+        transformation_version: str = "1.0.0",
     ) -> SourceLineageRecord:
         """
         Creates and indexes an individual lineage tracking record.
@@ -63,6 +64,7 @@ class SourceLineageTracker:
         source_id_field: str = "id",
         canonical_id_field: str = "sku_id",
         source_timestamp_field: Optional[str] = "timestamp",
+        transformation_version: str = "1.0.0",
     ) -> List[SourceLineageRecord]:
         """
         Generates and stores lineage records for a batch of ingested records.
@@ -88,6 +90,7 @@ class SourceLineageTracker:
                 canonical_record_id=canon_id,
                 sync_run_id=sync_run_id,
                 source_timestamp=src_ts,
+                transformation_version=transformation_version,
             )
             lineage_records.append(record)
 

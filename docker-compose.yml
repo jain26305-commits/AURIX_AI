@@ -1,0 +1,139 @@
+﻿services:
+  aurix-postgres:
+    image: postgres:16-alpine
+    container_name: aurix_enterprise_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER is required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB is required}
+    ports:
+      - "5432:5432"
+    volumes:
+      - aurix_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aurix-net
+
+  aurix-redis:
+    image: redis:7-alpine
+    container_name: aurix_enterprise_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aurix-net
+
+  aurix-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aurix_enterprise_api
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      ENVIRONMENT: "production"
+      ENABLE_DOCS: "false"
+      DEBUG: "false"
+      API_SECRET_KEY: ${API_SECRET_KEY:?API_SECRET_KEY is required}
+      DATABASE_URL: postgresql+psycopg://aurix_runtime:${AURIX_RUNTIME_PASSWORD:?AURIX_RUNTIME_PASSWORD is required}@aurix-postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      RELEASE_COMMIT: ${RELEASE_COMMIT:?RELEASE_COMMIT is required}
+      REDIS_URL: redis://aurix-redis:6379/0
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-Aurix_Ai}
+      ARTIFACT_STORAGE_BACKEND: ${ARTIFACT_STORAGE_BACKEND:-supabase}
+      ARTIFACT_STORAGE_BUCKET: ${ARTIFACT_STORAGE_BUCKET:-aurix-artifacts}
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
+    depends_on:
+      aurix-postgres:
+        condition: service_healthy
+      aurix-redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "curl",
+          "-fsS",
+          "http://localhost:8000/api/v1/health"
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    networks:
+      - aurix-net
+
+  aurix-worker:
+    healthcheck:
+      disable: true
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: aurix_enterprise_worker
+    restart: always
+    command:
+      - celery
+      - -A
+      - aurix_core.worker.celery_app
+      - worker
+      - --loglevel=info
+      - -c
+      - "2"
+    environment:
+      ENVIRONMENT: "production"
+      ENABLE_DOCS: "false"
+      DEBUG: "false"
+      API_SECRET_KEY: ${API_SECRET_KEY:?API_SECRET_KEY is required}
+      RELEASE_COMMIT: ${RELEASE_COMMIT:?RELEASE_COMMIT is required}
+      DATABASE_URL: postgresql+psycopg://aurix_runtime:${AURIX_RUNTIME_PASSWORD:?AURIX_RUNTIME_PASSWORD is required}@aurix-postgres:5432/${POSTGRES_DB:?POSTGRES_DB is required}
+      REDIS_URL: redis://aurix-redis:6379/0
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID:-Aurix_Ai}
+      ARTIFACT_STORAGE_BACKEND: ${ARTIFACT_STORAGE_BACKEND:-supabase}
+      ARTIFACT_STORAGE_BUCKET: ${ARTIFACT_STORAGE_BUCKET:-aurix-artifacts}
+      SUPABASE_URL: ${SUPABASE_URL:?SUPABASE_URL is required}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY is required}
+    depends_on:
+      aurix-postgres:
+        condition: service_healthy
+      aurix-redis:
+        condition: service_healthy
+    networks:
+      - aurix-net
+  aurix-client:
+    build:
+      context: ./aurix_client
+      dockerfile: Dockerfile
+    container_name: aurix_enterprise_client
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NEXT_PUBLIC_AURIX_API_URL: http://localhost:8000/api/v1
+      NEXT_PUBLIC_AURIX_API_MODE: PRODUCTION
+    depends_on:
+      aurix-api:
+        condition: service_started
+    networks:
+      - aurix-net
+
+networks:
+  aurix-net:
+    driver: bridge
+
+volumes:
+  aurix_pg_data:

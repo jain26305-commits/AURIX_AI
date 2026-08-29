@@ -1,4 +1,5 @@
 import datetime
+import math
 import uuid
 from typing import Any, Dict, Optional
 from aurix_core.inventory.config import InventoryConfiguration
@@ -83,9 +84,68 @@ class Phase4Orchestrator:
                 },
             )
 
-        srv_level_val = sku_user_data.get("service_level", InventoryConfiguration.DEFAULT_SERVICE_LEVEL)
-        srv_source = "USER_PROVIDED" if "service_level" in sku_user_data else "CONFIGURATION"
-        z_score = InventoryConfiguration.get_z_score(float(srv_level_val))
+        srv_level_val = sku_user_data.get(
+            "service_level",
+            InventoryConfiguration.DEFAULT_SERVICE_LEVEL,
+        )
+        srv_source = (
+            "USER_PROVIDED"
+            if "service_level" in sku_user_data
+            else "CONFIGURATION"
+        )
+
+        try:
+            srv_level_numeric = float(srv_level_val)
+        except (TypeError, ValueError):
+            srv_level_numeric = float("nan")
+
+        if (
+            not math.isfinite(srv_level_numeric)
+            or srv_level_numeric < 0.90
+            or srv_level_numeric > 0.999
+        ):
+            missing_inputs.append(
+                MissingInput(
+                    field="service_level",
+                    state="INVALID_INPUT",
+                    domain="inventory",
+                    severity="CRITICAL",
+                    prompt=(
+                        "Service level must be a finite value "
+                        "between 0.90 and 0.999."
+                    ),
+                )
+            )
+
+            return Phase5InputContract(
+                sku_id=sku_id,
+                status="USER_INPUT_REQUIRED",
+                missing_inputs=missing_inputs,
+                metrics=None,
+                risk_status="NOT_ASSESSABLE",
+                financials=None,
+                policy_applied=None,
+                limitations=(
+                    p3_contract.limitations
+                    + ["INVALID_SERVICE_LEVEL"]
+                ),
+                provenance={
+                    "phase4_run_id": self.run_id,
+                    "phase3_run_id": p3_contract.provenance.get(
+                        "phase3_run_id",
+                        "UNKNOWN",
+                    ),
+                    "dataset_hash": p3_contract.provenance.get(
+                        "dataset_hash",
+                        "UNKNOWN",
+                    ),
+                    "engine_version": "4.0.0",
+                },
+            )
+
+        z_score = InventoryConfiguration.get_z_score(
+            srv_level_numeric
+        )
 
         lead_time_std = float(sku_user_data.get("lead_time_std", 0.0))
         combined_std = InventoryMathematics.calculate_combined_std(
@@ -112,36 +172,76 @@ class Phase4Orchestrator:
             eoq_val = None
             eoq_state = ValueState.UNAVAILABLE
 
-        on_hand = float(sku_user_data.get("on_hand_qty", 0.0))
-        inbound = float(sku_user_data.get("inbound_qty", 0.0))
-        committed = float(sku_user_data.get("committed_qty", 0.0))
+        on_hand_raw = sku_user_data.get("on_hand_qty")
+        inbound_raw = sku_user_data.get("inbound_qty")
+        committed_raw = sku_user_data.get("committed_qty")
 
-        inv_position = InventoryMathematics.calculate_inventory_position(on_hand, inbound, committed)
-        coverage_days = InventoryMathematics.calculate_coverage_days(on_hand, daily_demand)
+        has_on_hand = on_hand_raw is not None
+
+        on_hand = float(on_hand_raw) if has_on_hand else None
+        inbound = float(inbound_raw) if inbound_raw is not None else 0.0
+        committed = float(committed_raw) if committed_raw is not None else 0.0
+
+        if has_on_hand:
+            inv_position = (
+                InventoryMathematics.calculate_inventory_position(
+                    on_hand,
+                    inbound,
+                    committed,
+                )
+            )
+            coverage_days = (
+                InventoryMathematics.calculate_coverage_days(
+                    on_hand,
+                    daily_demand,
+                )
+            )
+        else:
+            inv_position = None
+            coverage_days = None
 
         moq = sku_user_data.get("moq")
         pack_size = sku_user_data.get("pack_size")
-        policy_res = InventoryPolicyEngine.evaluate_policy(
-            inventory_position=inv_position,
-            reorder_point=reorder_point_val,
-            eoq=eoq_val,
-            daily_demand=daily_demand,
-            lead_time_days=float(lead_time_days),
-            moq=float(moq) if moq else None,
-            pack_size=float(pack_size) if pack_size else None,
-        )
 
-        risk_res = InventoryRiskEvaluator.evaluate_risk(
-            on_hand_qty=on_hand,
-            inventory_position=inv_position,
-            reorder_point=reorder_point_val,
-            safety_stock=safety_stock_val,
-            lead_time_days=float(lead_time_days),
-            daily_demand=daily_demand,
-        )
+        if has_on_hand:
+            policy_res = InventoryPolicyEngine.evaluate_policy(
+                inventory_position=inv_position,
+                reorder_point=reorder_point_val,
+                eoq=eoq_val,
+                daily_demand=daily_demand,
+                lead_time_days=float(lead_time_days),
+                moq=float(moq) if moq else None,
+                pack_size=float(pack_size) if pack_size else None,
+            )
 
-        if unit_cost is not None and unit_cost > 0.0:
-            inv_value = round(on_hand * float(unit_cost), 2)
+            risk_res = InventoryRiskEvaluator.evaluate_risk(
+                on_hand_qty=on_hand,
+                inventory_position=inv_position,
+                reorder_point=reorder_point_val,
+                safety_stock=safety_stock_val,
+                lead_time_days=float(lead_time_days),
+                daily_demand=daily_demand,
+            )
+        else:
+            policy_res = {
+                "policy": None,
+                "constrained_order_quantity": None,
+                "constraint_reason": "ON_HAND_INVENTORY_UNAVAILABLE",
+            }
+
+            risk_res = {
+                "stockout_risk": "NOT_ASSESSABLE",
+            }
+
+        if (
+            has_on_hand
+            and unit_cost is not None
+            and unit_cost > 0.0
+        ):
+            inv_value = round(
+                on_hand * float(unit_cost),
+                2,
+            )
             annual_holding = round(inv_value * float(holding_rate), 2)
             fin_exposure = FinancialExposure(
                 inventory_value=TrackedValue(value=inv_value, state=ValueState.DERIVED, source="UNIT_COST_X_ON_HAND"),
@@ -179,18 +279,38 @@ class Phase4Orchestrator:
             ),
             order_quantity=TrackedValue(
                 value=policy_res["constrained_order_quantity"],
-                state=ValueState.DERIVED,
-                source=policy_res["policy"],
+                state=(
+                    ValueState.DERIVED
+                    if has_on_hand
+                    else ValueState.UNAVAILABLE
+                ),
+                source=(
+                    policy_res["policy"]
+                    if has_on_hand
+                    else "ON_HAND_INVENTORY_UNAVAILABLE"
+                ),
                 notes=policy_res["constraint_reason"],
             ),
             inventory_position=TrackedValue(
                 value=inv_position,
-                state=ValueState.DERIVED,
-                source="ON_HAND_PLUS_INBOUND_MINUS_COMMITTED",
+                state=(
+                    ValueState.DERIVED
+                    if has_on_hand
+                    else ValueState.UNAVAILABLE
+                ),
+                source=(
+                    "ON_HAND_PLUS_INBOUND_MINUS_COMMITTED"
+                    if has_on_hand
+                    else "NO_ON_HAND_INVENTORY"
+                ),
             ),
             inventory_coverage_days=TrackedValue(
                 value=coverage_days,
-                state=ValueState.DERIVED if coverage_days else ValueState.UNAVAILABLE,
+                state=(
+                    ValueState.DERIVED
+                    if has_on_hand
+                    else ValueState.UNAVAILABLE
+                ),
                 source="ON_HAND_DIVIDED_BY_DAILY_DEMAND",
             ),
         )
@@ -203,7 +323,14 @@ class Phase4Orchestrator:
             risk_status=risk_res["stockout_risk"],
             financials=fin_exposure,
             policy_applied=policy_res["policy"],
-            limitations=p3_contract.limitations,
+            limitations=(
+                p3_contract.limitations
+                + (
+                    ["ON_HAND_INVENTORY_UNAVAILABLE"]
+                    if not has_on_hand
+                    else []
+                )
+            ),
             provenance={
                 "phase4_run_id": self.run_id,
                 "phase3_run_id": p3_contract.provenance.get("phase3_run_id", "UNKNOWN"),

@@ -1,22 +1,26 @@
-"""Data ingestion and readiness assessment router for Phase 10 Application API."""
+﻿"""Data ingestion, canonical data fabric, and quarantine router for Phase 10 & Phase 19."""
 
 import logging
-from typing import Generator
-from fastapi import APIRouter, Depends
+from typing import Any, Dict, Generator, List, Optional
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from aurix_api.schemas.base import ApiResponse, ResponseMetadata, ResponseStatus
 from aurix_api.schemas.auth import Permission, TenantContext
+from aurix_api.schemas.base import ApiResponse, ResponseMetadata, ResponseStatus
 from aurix_api.schemas.data import DataIngestRequest, DataIngestSummary, EntityReadinessDetail, ReadinessResponse
 from aurix_api.security.auth import get_current_tenant_context
-from aurix_api.security.rbac import require_permission
 from aurix_api.security.rate_limit import rate_limit_standard
+from aurix_api.security.rbac import require_permission
+from aurix_core.data_fabric.aggregations import AggregatedInventorySummary, AggregatedOrderSummary, DataFabricAggregator
+from aurix_core.data_fabric.contracts import CanonicalEntityType, QuarantineEnvelope
+from aurix_core.data_fabric.quarantine import QuarantineManager
 from aurix_core.database.engine import SessionLocal
 from aurix_core.intelligence.readiness import DataReadinessEngine
 
 logger = logging.getLogger("aurix_api.routers.data")
 
 router = APIRouter(prefix="/api/v1/data", tags=["Data Ingestion & Readiness"])
+_quarantine_mgr = QuarantineManager()
 
 
 def get_db() -> Generator[Session, None, None]:
@@ -46,7 +50,6 @@ async def ingest_dataset(
     entity_name = payload.entity_name
     records = payload.records
 
-    # Evaluate readiness / quality on incoming records via Phase 9 engine
     assessment = DataReadinessEngine.evaluate_entity_readiness(
         entity_name=entity_name,
         records=records,
@@ -83,10 +86,61 @@ async def ingest_dataset(
 
 
 @router.get(
+    "/quarantine",
+    response_model=ApiResponse[List[QuarantineEnvelope]],
+    summary="List Quarantined Records",
+)
+async def list_quarantined_records(
+    resolved: Optional[bool] = False,
+    tenant_context: TenantContext = Depends(get_current_tenant_context),
+    _: TenantContext = Depends(require_permission(Permission.READ_DATA)),
+) -> ApiResponse[List[QuarantineEnvelope]]:
+    """Lists isolated defective records awaiting review or automated replay."""
+    tenant_id = tenant_context.tenant_id
+    records = _quarantine_mgr.list_quarantined(tenant_id=tenant_id, resolved=resolved)
+
+    return ApiResponse(
+        status=ResponseStatus.SUCCESS,
+        data=records,
+        meta=ResponseMetadata(tenant_id=tenant_id),
+    )
+
+
+@router.post(
+    "/quarantine/{quarantine_id}/replay",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Replay Quarantined Record",
+)
+async def replay_quarantined_record(
+    quarantine_id: str,
+    remediated_payload: Optional[Dict[str, Any]] = None,
+    tenant_context: TenantContext = Depends(get_current_tenant_context),
+    _: TenantContext = Depends(require_permission(Permission.WRITE_DATA)),
+) -> ApiResponse[Dict[str, Any]]:
+    """Replays an isolated record through the validation pipeline."""
+    success = _quarantine_mgr.replay_record(
+        quarantine_id=quarantine_id,
+        pipeline_handler=lambda p: True,
+        remediated_payload=remediated_payload,
+    )
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Failed to replay quarantine record '{quarantine_id}'.",
+        )
+
+    return ApiResponse(
+        status=ResponseStatus.SUCCESS,
+        data={"quarantine_id": quarantine_id, "replayed": True},
+        meta=ResponseMetadata(tenant_id=tenant_context.tenant_id),
+    )
+
+
+@router.get(
     "/readiness",
     response_model=ApiResponse[ReadinessResponse],
     summary="Evaluate Dataset Readiness",
-    description="Returns the portfolio-wide data readiness, completeness, and freshness evaluation.",
 )
 async def get_dataset_readiness(
     tenant_context: TenantContext = Depends(get_current_tenant_context),

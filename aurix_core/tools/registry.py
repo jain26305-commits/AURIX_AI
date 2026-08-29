@@ -419,12 +419,71 @@ def _intelligence_snapshot(db: Session, req: ToolRequest) -> ToolResult:
     except (TypeError, ValueError):
         payload = {}
 
+    high_risk = payload.get("high_risk_skus_count")
+    supplier_risks = payload.get("supplier_risks_count")
+    delayed_shipments = payload.get("delayed_shipments_count")
+    bottlenecks = payload.get("network_bottlenecks_count")
+    financial_exposure = payload.get("financial_exposure_summary") or {}
+    active_capabilities = payload.get("active_capabilities") or []
+    unavailable_capabilities = payload.get("unavailable_capabilities") or []
+
+    risk_signals = []
+
+    if isinstance(high_risk, (int, float)) and high_risk > 0:
+        risk_signals.append(
+            f"{int(high_risk)} high-risk SKU(s)"
+        )
+
+    if isinstance(supplier_risks, (int, float)) and supplier_risks > 0:
+        risk_signals.append(
+            f"{int(supplier_risks)} supplier risk(s)"
+        )
+
+    if isinstance(delayed_shipments, (int, float)) and delayed_shipments > 0:
+        risk_signals.append(
+            f"{int(delayed_shipments)} delayed shipment(s)"
+        )
+
+    if isinstance(bottlenecks, (int, float)) and bottlenecks > 0:
+        risk_signals.append(
+            f"{int(bottlenecks)} network bottleneck(s)"
+        )
+
+    if risk_signals:
+        risk_summary = "Primary risk signals: " + ", ".join(risk_signals) + "."
+        headline = "AURIX portfolio risk posture is active."
+    else:
+        risk_summary = "No elevated risk signals are present in the persisted portfolio snapshot."
+        headline = "AURIX portfolio risk posture is currently nominal."
+
+    answer_parts = [headline, risk_summary]
+
+    if financial_exposure:
+        answer_parts.append(
+            "Financial exposure data is available in the persisted baseline."
+        )
+
+    if active_capabilities:
+        answer_parts.append(
+            f"{len(active_capabilities)} intelligence capability(ies) are active."
+        )
+
+    if unavailable_capabilities:
+        answer_parts.append(
+            f"{len(unavailable_capabilities)} capability(ies) currently have insufficient or unavailable upstream evidence."
+        )
+
     return ToolResult(
         success=True,
         tool_name="intelligence.snapshot",
         capability="PORTFOLIO_SNAPSHOT",
-        answer="AURIX found the latest persisted intelligence snapshot.",
-        data={"snapshot_id": record.id, "run_id": record.run_id, "snapshot": payload},
+        answer=" ".join(answer_parts),
+        data={
+            "snapshot_id": record.id,
+            "run_id": record.run_id,
+            "snapshot": payload,
+            "risk_signals": risk_signals,
+        },
         provenance={
             "source_tables": ["intelligence_snapshots"],
             "snapshot_id": record.id,

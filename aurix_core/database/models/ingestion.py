@@ -1,7 +1,9 @@
 """Database models for tracking the lifecycle of data ingestion runs."""
 
 from datetime import datetime
+
 from sqlalchemy import Column, String, Integer, DateTime, Text
+
 from aurix_core.database.engine import Base
 from aurix_core.database.models.base import TenantMixin
 
@@ -39,3 +41,33 @@ class OnboardingQuarantineRecord(Base, TenantMixin):
     reason = Column(Text, nullable=False)
     payload_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class OnboardingDataset(Base, TenantMixin):
+    """
+    Durable tenant-scoped staging record for an onboarding dataset.
+
+    Stores the original parsed records so an onboarding run can be resumed
+    after manual mapping or other user input without requiring the browser
+    to resend the original file contents.
+    """
+
+    __tablename__ = "onboarding_datasets"
+
+    id = Column(String(64), primary_key=True, index=True)
+    source_name = Column(String(255), nullable=False)
+    source_type = Column(String(32), nullable=False)
+    input_hash = Column(String(128), nullable=False, index=True)
+
+    raw_payload_json = Column(Text, nullable=False)
+    source_columns_json = Column(Text, nullable=True)
+
+    detected_entity = Column(String(128), nullable=True, index=True)
+    status = Column(String(32), nullable=False, default="RECEIVED")
+
+    created_at = Column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+    )
+    updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

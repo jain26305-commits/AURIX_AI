@@ -165,6 +165,7 @@ class OnboardingResult(BaseModel):
     temporal_coverage: Optional[TemporalCoverage] = None
     schema_discovery: Optional[SchemaDiscoveryReport] = None
     capability_summary: Optional[CapabilityOnboardingSummary] = None
+    preview_records: List[Dict[str, Any]] = Field(default_factory=list)
     duplicate_status: DuplicateCorrectionStatus = DuplicateCorrectionStatus.NONE
     correction_status: DuplicateCorrectionStatus = DuplicateCorrectionStatus.NONE
     recomputed_capabilities: List[str] = Field(default_factory=list)

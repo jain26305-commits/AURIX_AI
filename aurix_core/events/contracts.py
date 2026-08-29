@@ -1,4 +1,4 @@
-"""Pydantic v2 data contracts, event status enums, taxonomy, and alert structures for Phase 13."""
+﻿"""Pydantic v2 data contracts, event status enums, taxonomy, and alert structures for Phase 13 & Phase 20."""
 
 from datetime import datetime, timezone
 from enum import Enum
@@ -37,9 +37,15 @@ class EventTaxonomy(str, Enum):
     SOURCE_SYNC_COMPLETED = "SOURCE_SYNC_COMPLETED"
     SOURCE_SYNC_FAILED = "SOURCE_SYNC_FAILED"
 
+    # Phase 20 Continuous Assurance Events
+    ASSURANCE_LEAKAGE_DETECTED = "ASSURANCE_LEAKAGE_DETECTED"
+    ASSURANCE_MATCH_FAILED = "ASSURANCE_MATCH_FAILED"
+    ASSURANCE_ANOMALY_FLAGGED = "ASSURANCE_ANOMALY_FLAGGED"
+    ASSURANCE_RECOVERY_REALIZED = "ASSURANCE_RECOVERY_REALIZED"
+
 
 class InternalEvent(BaseModel):
-    """Normalized internal event contract bridging Phase 12 integrations and Phase 13 intelligence."""
+    """Normalized internal event contract bridging Phase 12 integrations and Phase 13/20 intelligence."""
     event_id: str = Field(..., description="Unique event identifier (e.g., EVT-12345)")
     tenant_id: str = Field(..., description="Strict tenant isolation boundary identifier")
     source_system: str = Field(..., description="Originating system (e.g., ERP_ODOO, WMS_GENERIC)")

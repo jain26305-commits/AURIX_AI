@@ -30,6 +30,14 @@ from aurix_core.database.repositories.intelligence import (
 )
 from aurix_core.intelligence.ai_gateway import AIGateway, AIResponseContract
 from aurix_core.intelligence.automation import AutomationEngine
+from aurix_core.intelligence.answer_composer import AnswerComposer
+from aurix_core.intelligence.claim_validator import ClaimValidator
+from aurix_core.intelligence.domain_registry import DomainRegistry
+from aurix_core.intelligence.evidence_fusion import EvidenceFusionEngine
+from aurix_core.intelligence.evidence_orchestrator import EvidenceOrchestrator
+from aurix_core.intelligence.expert_contracts import ExpertContractRegistry
+from aurix_core.intelligence.decision_resolver import DeterministicDecisionResolver
+from aurix_core.intelligence.intelligence_orchestrator import IntelligenceOrchestrator
 from aurix_core.intelligence.context import ContextBuilder
 from aurix_core.intelligence.discovery import CapabilityDiscoveryEngine
 from aurix_core.intelligence.incremental import IncrementalMergeEngine, IncrementalUpdateReport
@@ -311,37 +319,163 @@ class IntelligenceService:
             conversation_history=conv_history,
         )
 
-        # 6. Deterministic-first execution. A registered AURIX tool is
-        # authoritative for direct READ queries and is never escalated to AI.
-        if routing_decision.fast_path_eligible and routing_decision.target_tool:
+        # 6. Canonical specialist execution path.
+        # Only intercept decisions with an explicit ExpertContract.
+        # Legacy deterministic ToolRegistry fast-path remains intact for
+        # capabilities that do not have a canonical specialist contract.
+        semantic = None
+        canonical_decision = None
+        try:
+            semantic_result = EvidenceOrchestrator.collect(
+                db=self.db,
+                tenant_id=self.tenant_id,
+                query=query,
+                entity_id=routing_decision.resolved_entity_id,
+            )
+            semantic = semantic_result.semantic
+            semantic_domain = (
+                routing_decision.domain.value
+                if routing_decision.domain is not None
+                else (semantic.dimensions[0] if semantic.dimensions else None)
+            )
+            canonical_decision = DeterministicDecisionResolver.resolve(
+                query=query,
+                domain=semantic_domain,
+                intent=semantic.question_type,
+                concepts=semantic.concepts,
+            )
+        except Exception:
+            semantic_result = None
+            canonical_decision = None
+
+        use_unified_specialist = bool(
+            canonical_decision is not None
+            and canonical_decision.name in ExpertContractRegistry.CONTRACTS
+        )
+
+        if use_unified_specialist and semantic_result is not None:
+            fused = EvidenceFusionEngine.fuse(
+                tenant_id=self.tenant_id,
+                query=query,
+                evidence_pack=semantic_result.evidence,
+                entity_id=routing_decision.resolved_entity_id,
+            )
+            execution = IntelligenceOrchestrator.execute(
+                decision=canonical_decision.name,
+                evidence_pack=semantic_result.evidence,
+                fused=fused,
+                domain=canonical_decision.domain,
+                intent=semantic.question_type,
+            )
+
+            # Canonical claim-governance boundary.
+            # All specialist claims must pass ClaimValidator before
+            # reaching the governed AnswerComposer.
+            validation_result = ClaimValidator.validate(
+                decision=canonical_decision.name,
+                claims=execution.claims,
+                available_sources=semantic_result.evidence.available_sources,
+                domain=canonical_decision.domain,
+                tenant_id=self.tenant_id,
+            )
+
+            composed = AnswerComposer.compose_validated_claims(
+                query=query,
+                decision=canonical_decision.name,
+                claims=validation_result.accepted,
+                validation_result=validation_result,
+                limitations=execution.limitations or execution.blockers,
+                confidence=execution.confidence,
+                evidence_quality=(
+                    fused.evidence_quality
+                    if not execution.blocked
+                    else "INSUFFICIENT"
+                ),
+                provenance={
+                    **execution.provenance,
+                    "canonical_decision": canonical_decision.name,
+                    "execution_status": execution.status,
+                    "execution_path": execution.execution_path,
+                },
+                tenant_id=self.tenant_id,
+            )
+
+            response_contract = AIResponseContract(
+                response_id=f"RESP-AURIX-{uuid.uuid4().hex[:10].upper()}",
+                response_type=semantic.question_type,
+                headline=composed.headline,
+                verified_facts=composed.verified_facts,
+                explanation=composed.answer,
+                recommendations=composed.recommendations,
+                data_limitations=composed.limitations,
+                source="AURIX_ENGINE",
+                answer_source="AURIX_ENGINE",
+                evidence_quality=composed.evidence_quality,
+                freshness="UNKNOWN",
+                provider_used="AURIX_ENGINE",
+                provider_status="LIVE",
+                model_used="deterministic-intelligence-orchestrator",
+                is_fallback=False,
+                token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+                provenance=composed.provenance,
+            )
+        elif routing_decision.fast_path_eligible and routing_decision.target_tool:
             tool_result = DeterministicToolExecutor.execute(
                 db=self.db,
                 tenant_id=self.tenant_id,
                 query=query,
                 routing=routing_decision,
             )
+            # N3.5 governed deterministic fast path.
+            #
+            # A raw ToolResult must not be represented as a verified
+            # analytical claim. Preserve the deterministic result as an
+            # explicit engine response while keeping provenance honest.
+            #
+            # No timestamp, freshness, authority, or evidence lineage
+            # is invented here.
+
+            fast_answer = str(tool_result.answer or "").strip()
+
+            fast_provenance = {
+                "tool_name": tool_result.tool_name,
+                "capability": tool_result.capability,
+                **tool_result.provenance,
+                "execution_path": "DETERMINISTIC_FAST_PATH",
+                "claims_validated": False,
+                "governance_note": (
+                    "Deterministic tool result; no specialist claim "
+                    "validation contract was applicable."
+                ),
+            }
+
             response_contract = AIResponseContract(
                 response_id=f"RESP-AURIX-{uuid.uuid4().hex[:10].upper()}",
                 response_type=routing_decision.query_type.value,
                 headline="AURIX Engine Result",
-                verified_facts=[tool_result.answer] if tool_result.answer else [],
-                explanation=tool_result.answer,
+                verified_facts=[],
+                explanation=fast_answer,
                 recommendations=[],
-                data_limitations=tool_result.limitations,
+                data_limitations=list(tool_result.limitations or []),
                 source="AURIX_ENGINE",
                 answer_source="AURIX_ENGINE",
-                evidence_quality="HIGH" if tool_result.success else "INSUFFICIENT_EVIDENCE",
-                freshness="LIVE" if tool_result.success else "UNKNOWN",
+                evidence_quality=(
+                    "HIGH"
+                    if tool_result.success
+                    else "INSUFFICIENT_EVIDENCE"
+                ),
+                freshness="UNKNOWN",
                 provider_used="AURIX_ENGINE",
                 provider_status="LIVE",
                 model_used="deterministic-tool",
                 is_fallback=False,
-                token_usage={"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
-                provenance={
-                    "tool_name": tool_result.tool_name,
-                    "capability": tool_result.capability,
-                    **tool_result.provenance,
+                token_usage={
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "total_tokens": 0,
                 },
+                provenance=fast_provenance,
+                tenant_id=self.tenant_id,
             )
         else:
             # 7. AI escalation path is only reached when AURIX cannot answer

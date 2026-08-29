@@ -1,4 +1,4 @@
-# Git and repository metadata
+﻿# Git and repository metadata
 .git/
 .github/
 
@@ -38,3 +38,7 @@ docs/
 
 # Local model/artifact outputs; production uses durable object storage
 artifacts/
+
+# Frontend dependencies / build output
+aurix_client/node_modules/
+aurix_client/.next/

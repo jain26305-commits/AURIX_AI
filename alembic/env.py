@@ -10,9 +10,11 @@ from sqlalchemy import engine_from_config, pool
 from aurix_core.config.settings import settings
 from aurix_core.database.engine import Base
 
-# Import every ORM model module so SQLAlchemy registers all mapped tables
-# in Base.metadata before Alembic performs autogeneration or migrations.
+# Explicitly import all ORM models to register with Base.metadata
 from aurix_core.database.models import (  # noqa: F401
+    actions,
+    auth,
+    connectors,
     economics,
     events,
     forecasting,
@@ -36,14 +38,13 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-# 1. Resolve database URL priority
+# 1. Resolve database URL priority: Env Var -> App Settings -> Config File
 configured_url = (
     os.getenv("ALEMBIC_DATABASE_URL")
+    or os.getenv("DATABASE_URL")
+    or str(settings.alembic_database_url or settings.database_url or "")
     or config.get_main_option("sqlalchemy.url")
 )
-
-if not configured_url or configured_url.startswith("driver://"):
-    configured_url = str(settings.alembic_database_url or settings.database_url)
 
 # 2. Sanitize async drivers for Alembic's sync engine
 if configured_url.startswith("postgresql+asyncpg://"):
@@ -65,7 +66,7 @@ def run_migrations_offline() -> None:
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
-        render_as_batch=True,  # Enables ALTER/DROP compatibility on SQLite
+        render_as_batch=True,
     )
 
     with context.begin_transaction():
@@ -86,7 +87,7 @@ def run_migrations_online() -> None:
             target_metadata=target_metadata,
             compare_type=True,
             compare_server_default=True,
-            render_as_batch=True,  # Enables ALTER/DROP compatibility on SQLite
+            render_as_batch=True,
         )
 
         with context.begin_transaction():

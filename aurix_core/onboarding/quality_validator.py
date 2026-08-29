@@ -12,7 +12,7 @@ from aurix_core.onboarding.contracts import (
 
 ENTITY_REQUIRED_FIELDS: Dict[str, Set[str]] = {
     "demand_history": {"sku_id", "date", "quantity"},
-    "inventory_levels": {"sku_id", "inventory_level"},
+    "inventory_levels": {"sku_id", "location_id", "on_hand"},
     "purchase_orders": {"order_id", "supplier_id", "lead_time_days"},
     "supplier_profiles": {"supplier_id"},
     "shipments": {"shipment_id", "origin_facility", "destination_facility"},
@@ -22,6 +22,8 @@ ENTITY_REQUIRED_FIELDS: Dict[str, Set[str]] = {
 
 NON_NEGATIVE_NUMERIC_FIELDS = {
     "quantity",
+    "on_hand",
+    "on_order",
     "inventory_level",
     "reorder_point",
     "safety_stock",
@@ -39,6 +41,7 @@ class QualityValidator:
         cls,
         records: List[Dict[str, Any]],
         canonical_fields: Set[str],
+        allow_negative_fields: Optional[Set[str]] = None,
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], DataQualitySummary]:
         """Validates mapped records against canonical constraints."""
         if not records:
@@ -47,6 +50,7 @@ class QualityValidator:
         accepted: List[Dict[str, Any]] = []
         rejected: List[Dict[str, Any]] = []
         error_breakdown: Dict[str, int] = {}
+        allowed_negative_fields = allow_negative_fields or set()
         total_cells = len(records) * len(canonical_fields) if canonical_fields else 1
         null_cells = 0
 
@@ -62,10 +66,14 @@ class QualityValidator:
                 elif field in NON_NEGATIVE_NUMERIC_FIELDS:
                     try:
                         num_val = float(str(val).replace(",", "").replace("$", ""))
-                        if num_val < 0:
-                            row_errors.append(f"Negative value ({num_val}) not permitted for '{field}'")
+                        if num_val < 0 and field not in allowed_negative_fields:
+                            row_errors.append(
+                                f"Negative value ({num_val}) not permitted for '{field}'"
+                            )
                     except ValueError:
-                        row_errors.append(f"Invalid numeric value '{val}' for '{field}'")
+                        row_errors.append(
+                            f"Invalid numeric value '{val}' for '{field}'"
+                        )
 
             if "date" in canonical_fields and row.get("date"):
                 d_str = str(row["date"]).strip()
@@ -232,8 +240,30 @@ class OnboardingQualityEngine:
         mapped_fields: Set[str],
     ) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], DataQualitySummary, TemporalCoverage, CompletenessSummary]:
         """Performs full quality validation, temporal coverage, and completeness assessment."""
-        accepted, rejected, quality = QualityValidator.validate_records(records, mapped_fields)
-        temporal = TemporalCoverageAnalyzer.analyze(accepted)
+        allow_negative_fields: Set[str] = set()
+
+        if entity_name == "inventory_movement_history":
+            # Historical inventory ledgers may legitimately record a
+            # negative closing balance representing an inventory deficit.
+            # Preserve the source fact rather than silently rejecting it.
+            allow_negative_fields.add("on_hand")
+
+        accepted, rejected, quality = QualityValidator.validate_records(
+            records,
+            mapped_fields,
+            allow_negative_fields=allow_negative_fields,
+        )
+
+        temporal_field = (
+            "period"
+            if entity_name == "inventory_movement_history"
+            else "date"
+        )
+
+        temporal = TemporalCoverageAnalyzer.analyze(
+            accepted,
+            date_field=temporal_field,
+        )
         completeness = CompletenessEvaluator.evaluate(entity_name, mapped_fields, quality, temporal)
 
         return accepted, rejected, quality, temporal, completeness

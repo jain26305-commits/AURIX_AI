@@ -243,6 +243,47 @@ class BusinessRouter:
                 confidence = RouterConfidence.LOW
                 requires_ai = False
 
+        # Portfolio/risk semantic flags used by routing telemetry and
+        # deterministic targeting. These are intentionally derived before
+        # capability selection so the metadata always reflects the actual
+        # query semantics.
+        is_portfolio_query = (
+            detected_domain is None
+            and resolved_entity_id is None
+            and any(
+                term in clean_query
+                for term in (
+                    "portfolio",
+                    "overall",
+                    "enterprise-wide",
+                    "enterprise wide",
+                    "across the network",
+                    "across the supply chain",
+                    "across all",
+                    "all suppliers",
+                    "all skus",
+                    "all products",
+                    "all shipments",
+                )
+            )
+        )
+
+        is_risk_query = any(
+            term in clean_query
+            for term in (
+                "risk",
+                "at risk",
+                "risk exposure",
+                "risk profile",
+                "risk summary",
+                "service risk",
+                "stockout risk",
+                "supply risk",
+                "operational risk",
+                "financial risk",
+            )
+        )
+
         # 6. Capability selection: prefer the most specific deterministic
         # capability rather than a broad domain default.
         target_cap: Optional[str] = None
@@ -333,5 +374,11 @@ class BusinessRouter:
                 "page_context_applied": page_context is not None,
                 "conversation_memory_applied": context_source == "CONVERSATION_MEMORY",
                 "detected_entity": detected_entity,
+                "portfolio_query": is_portfolio_query,
+                "risk_query": is_risk_query,
+                "deterministic_candidate": deterministic_ready,
+                "deterministic_target": (
+                    resolved_tool.name if resolved_tool else None
+                ),
             },
         )

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     debug: bool = False
 
     # Database
-    database_url: str = "sqlite:///./aurix_enterprise.db"
+    database_url: str = Field(default="postgresql+psycopg://aurix:AurixSecurePassword2026!@localhost:5432/aurix_db")
     alembic_database_url: str = Field(
         default="",
         description="Explicit database URL override for Alembic migration execution.",
@@ -49,7 +49,10 @@ class Settings(BaseSettings):
     # Runtime build identity
     build_version: str = Field(default="16.0.0")
     schema_version: str = Field(default="1.0.0")
-    release_commit: str = Field(default="HEAD")
+    release_commit: str = Field(
+    default="HEAD",
+    validation_alias="RELEASE_COMMIT",
+)
 
     # Data retention
     retention_days_runs: int = Field(default=90)
@@ -62,8 +65,7 @@ class Settings(BaseSettings):
     api_host: str = Field(default="0.0.0.0")
     api_port: int = Field(default=8000)
     api_prefix: str = Field(default="/api/v1")
-    enable_docs: bool = Field(default=True)
-
+    enable_docs: bool = Field(default=False, validation_alias="ENABLE_DOCS")
     # Security / authentication
     # Intentionally not a real secret. Production validation below rejects it.
     api_secret_key: str = Field(

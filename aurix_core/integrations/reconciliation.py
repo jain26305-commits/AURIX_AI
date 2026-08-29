@@ -1,24 +1,26 @@
-"""Multi-source data reconciliation and conflict resolution engine for Phase 12."""
+﻿"""Multi-source data reconciliation and conflict resolution engine for Phase 12, Phase 19, and Phase 20."""
 
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from aurix_core.config.settings import settings
+from aurix_core.data_fabric.source_authority import SourceAuthorityMatrix
 from aurix_core.integrations.contracts import ReconciliationRecord, ReconciliationStatus
 
-# Default configurable source priority by business domain
 DEFAULT_DOMAIN_SOURCE_PRIORITY: Dict[str, List[str]] = {
-    "inventory": ["WMS", "ERP", "POS", "SFTP", "API"],
-    "finance": ["ERP", "CRM", "ECOMMERCE", "API"],
+    "inventory": ["WMS", "SAP", "ODOO", "ERP", "POS", "SFTP", "API"],
+    "finance": ["SAP", "ODOO", "ERP", "CRM", "ECOMMERCE", "API"],
     "shipments": ["TMS", "TELEMATICS", "CARRIER", "ERP", "API"],
-    "orders": ["ECOMMERCE", "CRM", "ERP", "POS", "API"],
-    "suppliers": ["ERP", "SUPPLIER_PORTAL", "EDI", "API"],
+    "orders": ["SHOPIFY", "ECOMMERCE", "CRM", "ODOO", "SAP", "ERP", "POS", "API"],
+    "suppliers": ["SAP", "ODOO", "ERP", "SUPPLIER_PORTAL", "EDI", "API"],
 }
 
 
 class ReconciliationEngine:
     """Detects, classifies, and reconciles variances across multi-source enterprise systems."""
+
+    _authority_matrix = SourceAuthorityMatrix()
 
     @staticmethod
     def compare_numeric_values(
@@ -41,7 +43,6 @@ class ReconciliationEngine:
         if val_a == 0.0 and val_b == 0.0:
             return 0.0, 0.0, ReconciliationStatus.MATCHED
 
-        # Baseline comparison using max magnitude to prevent extreme skew
         baseline = max(abs(val_a), abs(val_b))
         variance_pct = round((abs_diff / baseline) * 100.0, 2) if baseline > 0 else 0.0
 
@@ -142,7 +143,6 @@ class ReconciliationEngine:
         Performs batch reconciliation across two source datasets.
         Returns: (reconciled_canonical_records, reconciliation_audit_trail)
         """
-        # Index datasets by key
         map_a: Dict[str, Dict[str, Any]] = {}
         for r in dataset_a:
             k = str(r.get(key_field, "")).strip()
@@ -181,7 +181,6 @@ class ReconciliationEngine:
                 )
                 audit_trail.append(rec_record)
 
-                # Base chosen row on preferred source
                 chosen_row = dict(row_a if preferred_source == source_a else row_b)
                 chosen_row["_reconciliation_status"] = rec_record.reconciliation_status.value
                 chosen_row["_variance_pct"] = rec_record.variance_pct

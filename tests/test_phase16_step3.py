@@ -13,6 +13,7 @@ from aurix_core.phase16.impact import ImpactPropagationService
 from aurix_core.observability.metrics import MetricsRegistry
 
 
+
 def build_session() -> sessionmaker[Session]:
     engine = create_engine(
         "sqlite://",

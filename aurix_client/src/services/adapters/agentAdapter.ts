@@ -1,0 +1,102 @@
+
+
+export class AgentAdapter {
+  public static generateSimulatedAgentActivity(): any {
+    return {
+      evaluatedAt: new Date().toISOString(),
+      summary: {
+        totalActiveAgents: 4,
+        tasksExecutedToday: 24,
+        meanToolLatencyMs: 142,
+        governanceClearanceRatePercent: 100.0,
+        autonomousInterventionsCount: 6,
+      },
+      tasks: [
+        {
+          taskId: 'TSK-AG-9041',
+          agentName: 'Disruption & Expedite Orchestrator',
+          agentRole: 'DISRUPTION_ORCHESTRATOR',
+          triggerEvent: 'Operational Alert ALT-9041 (Stockout projected for SKU-004 within 6d)',
+          status: 'SUCCESS',
+          startedAt: new Date(Date.now() - 1000 * 60 * 42).toISOString(),
+          completedAt: new Date(Date.now() - 1000 * 60 * 41).toISOString(),
+          durationMs: 840,
+          targetEntityId: 'SKU-004',
+          targetEntityName: '103 Black-XXL (Hoodie)',
+          evidenceSummary: 'Analyzed on-hand buffer (42u), daily velocity (3.8u/d), and Surat-BLR lane delay (+2.5d). Formulated Air Expedite Scenario A.',
+          synthesizedRecommendationId: 'REC-2026-084',
+          governanceClearanceToken: 'GOV-PH14-CLEAR-8841',
+          toolsUsed: [
+            {
+              invocationId: 'INV-01',
+              toolName: 'InventoryBufferSolver',
+              category: 'DETERMINISTIC_ENGINE',
+              inputParameters: { skuId: 'SKU-004', horizonDays: 30 },
+              outputSummary: 'Forward cover verified at 15.0 days against 35d lead-time target. Breach probability: 98.4%.',
+              executionLatencyMs: 42,
+              status: 'SUCCESS',
+              timestamp: '11:18 AM IST',
+            },
+            {
+              invocationId: 'INV-02',
+              toolName: 'FreightLaneRiskAnalyzer',
+              category: 'SQL_ANALYTICS',
+              inputParameters: { laneId: 'LANE-SUR-BLR', carrierId: 'GATI-01' },
+              outputSummary: 'P90 transit time evaluated at 8.5d (+2.5d variance). Congestion severity: CRITICAL.',
+              executionLatencyMs: 65,
+              status: 'SUCCESS',
+              timestamp: '11:18 AM IST',
+            },
+            {
+              invocationId: 'INV-03',
+              toolName: 'ScenarioBranchSimulator',
+              category: 'OPTIMIZATION_SOLVER',
+              inputParameters: { targetServiceLevel: 98.0, leadTimeReductionDays: 14 },
+              outputSummary: 'Branch Expedite-Air evaluated: Cost ₹42,000, Protected Revenue ₹1,58,700, Net Impact +₹1,16,700.',
+              executionLatencyMs: 120,
+              status: 'SUCCESS',
+              timestamp: '11:19 AM IST',
+            },
+          ],
+        },
+        {
+          taskId: 'TSK-AG-9042',
+          agentName: 'Working Capital Rightsizer',
+          agentRole: 'INVENTORY_OPTIMIZER',
+          triggerEvent: 'Quarterly Holding Cost Drift Audit',
+          status: 'SUCCESS',
+          startedAt: new Date(Date.now() - 1000 * 60 * 180).toISOString(),
+          completedAt: new Date(Date.now() - 1000 * 60 * 179).toISOString(),
+          durationMs: 910,
+          targetEntityId: 'SKU-005',
+          targetEntityName: '104 Olive-M (Jeans)',
+          evidenceSummary: 'Identified 178 units excess stock carrying 22% holding cost drag. Synthesized Markdown Action ACT-2026-092.',
+          synthesizedRecommendationId: 'REC-2026-080',
+          governanceClearanceToken: 'GOV-PH14-CLEAR-8812',
+          toolsUsed: [
+            {
+              invocationId: 'INV-01',
+              toolName: 'EconomicsLedgerScanner',
+              category: 'SQL_ANALYTICS',
+              inputParameters: { thresholdDaysOfCover: 180 },
+              outputSummary: 'SKU-005 cover identified at 331 days. Excess capital exposure: ₹2,13,600.',
+              executionLatencyMs: 85,
+              status: 'SUCCESS',
+              timestamp: '09:00 AM IST',
+            },
+            {
+              invocationId: 'INV-02',
+              toolName: 'MarkdownElasticitySolver',
+              category: 'OPTIMIZATION_SOLVER',
+              inputParameters: { currentPriceINR: 1499, targetLiquidationDays: 45 },
+              outputSummary: 'Optimal discount determined at 15.0%. Margin preserved at 24.2%.',
+              executionLatencyMs: 140,
+              status: 'SUCCESS',
+              timestamp: '09:01 AM IST',
+            },
+          ],
+        },
+      ],
+    };
+  }
+}

@@ -1,4 +1,4 @@
-"""Tenant-isolated CRUD repositories for Phase 9 & Phase 10 Executive Intelligence entities."""
+﻿"""Tenant-isolated CRUD repositories for Phase 9 & Phase 10 Executive Intelligence entities."""
 
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -200,18 +200,36 @@ class ConversationMessageRepository(BaseRepository[ConversationMessageModel]):
     def __init__(self, db: Session, tenant_id: str) -> None:
         super().__init__(ConversationMessageModel, db, tenant_id)
 
-    def list_by_conversation(self, conversation_id: str, limit: int = 50) -> List[ConversationMessageModel]:
-        """Lists message history for a conversation ordered chronologically."""
-        return (
+    def list_by_conversation(
+        self,
+        conversation_id: str,
+        limit: int = 50,
+    ) -> List[ConversationMessageModel]:
+        """
+        Return the latest messages for a conversation in chronological order.
+
+        The database selects the newest ``limit`` records deterministically,
+        then the result is reversed for downstream oldest-to-newest processing.
+        Tenant isolation remains enforced by the query predicate.
+        """
+        if limit <= 0:
+            return []
+
+        messages = (
             self.db.query(ConversationMessageModel)
             .filter(
                 ConversationMessageModel.tenant_id == self.tenant_id,
                 ConversationMessageModel.conversation_id == conversation_id,
             )
+            .order_by(
+                ConversationMessageModel.created_at.desc(),
+                ConversationMessageModel.id.desc(),
+            )
             .limit(limit)
             .all()
         )
 
+        return list(reversed(messages))
 
 class AIAuditLogRepository(BaseRepository[AIAuditLogModel]):
     """Repository for auditing AI interactions with multi-tenant isolation."""

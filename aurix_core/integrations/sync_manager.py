@@ -1,4 +1,4 @@
-"""Master synchronization orchestration manager for Phase 12 Universal Integration Hub."""
+﻿"""Master synchronization orchestration manager for Phase 12 & Phase 19 Enterprise Data Fabric."""
 
 import hashlib
 import json
@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from aurix_core.config.settings import settings
+from aurix_core.data_fabric.checkpointing import CheckpointManager
+from aurix_core.data_fabric.idempotency import IdempotencyEngine
+from aurix_core.data_fabric.retry_policy import RetryPolicyEngine
 from aurix_core.integrations.base import BaseConnector, ConnectorException
 from aurix_core.integrations.contracts import (
     ConnectorHealthState,
@@ -29,6 +32,8 @@ class SyncManager:
     """Orchestrates external data synchronization, retries, checkpointing, and capability recomputation."""
 
     _sync_runs_store: Dict[str, List[SyncRunRecord]] = {}
+    _checkpoint_mgr = CheckpointManager()
+    _idempotency_engine = IdempotencyEngine()
 
     @classmethod
     def clear_test_store(cls) -> None:
@@ -75,42 +80,25 @@ class SyncManager:
         Executes connector sync with exponential backoff for transient failures.
         """
         max_attempts = connector.max_retries
-        backoff_factor = settings.connector_retry_backoff_factor
         last_exception: Optional[Exception] = None
 
         for attempt in range(1, max_attempts + 1):
             try:
                 return connector.execute_sync(mode=mode, cursor=cursor, batch_size=batch_size)
-            except ConnectorException as ce:
-                last_exception = ce
-                # Do not retry non-transient auth or schema rejections
-                if ce.code in ("AUTHENTICATION_FAILED", "SCHEMA_MISMATCH"):
-                    raise ce
+            except Exception as exc:
+                last_exception = exc
+                decision = RetryPolicyEngine.evaluate(exc, attempt=attempt)
+                if not decision.should_retry:
+                    raise exc
 
-                if attempt < max_attempts:
-                    sleep_time = backoff_factor ** (attempt - 1)
-                    logger.warning(
-                        "Sync attempt %d/%d failed for connector [%s]. Retrying in %.2fs: %s",
-                        attempt,
-                        max_attempts,
-                        connector.connector_id,
-                        sleep_time,
-                        ce.message,
-                    )
-                    time.sleep(sleep_time)
-            except Exception as e:
-                last_exception = e
-                if attempt < max_attempts:
-                    sleep_time = backoff_factor ** (attempt - 1)
-                    logger.warning(
-                        "Unexpected error on sync attempt %d/%d for connector [%s]. Retrying in %.2fs: %s",
-                        attempt,
-                        max_attempts,
-                        connector.connector_id,
-                        sleep_time,
-                        str(e),
-                    )
-                    time.sleep(sleep_time)
+                logger.warning(
+                    "Sync attempt %d/%d failed for connector [%s]. %s",
+                    attempt,
+                    max_attempts,
+                    connector.connector_id,
+                    decision.reason,
+                )
+                time.sleep(decision.delay_seconds)
 
         if last_exception:
             raise last_exception
@@ -145,7 +133,7 @@ class SyncManager:
         )
 
         try:
-            # 1. Execute Extraction with Retry & Backoff
+            # 1. Execute Extraction with Bounded Retry
             raw_records, cursor_after = cls.execute_with_retry(
                 connector=connector,
                 mode=mode,
@@ -207,7 +195,14 @@ class SyncManager:
             }
             CapabilityDiscoveryEngine.discover(readiness_map=readiness_map)
 
-            # 6. Advance Checkpoint Cursor & Update Connector State
+            # 6. Advance Checkpoint Cursor in Fabric Manager
+            cls._checkpoint_mgr.commit_checkpoint(
+                tenant_id=tenant_id,
+                connector_id=connector_id,
+                stream_name=entity_name,
+                rows_processed=len(accepted),
+            )
+
             connector.config.cursor = cursor_after
             connector.config.last_sync_timestamp = datetime.now(timezone.utc).isoformat()
             connector.config.last_sync_status = SyncStatus.COMPLETED

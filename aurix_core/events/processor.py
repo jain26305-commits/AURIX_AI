@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from aurix_core.events.contracts import (
     AlertContract,
@@ -94,25 +95,24 @@ class EventProcessor:
 
         if db is not None:
             try:
-                db_event = (
-                    db.query(PersistentEventModel)
-                    .filter(
-                        PersistentEventModel.tenant_id == tenant_id,
-                        PersistentEventModel.event_id == event_id,
-                    )
-                    .first()
+                stmt = pg_insert(PersistentEventModel).values(
+                    event_id=event_id,
+                    tenant_id=tenant_id,
+                    idempotency_key=key,
+                    status=EventStatus.COMPLETED.value,
                 )
-                if db_event:
-                    db_event.status = cast(Any, EventStatus.COMPLETED.value)
-                    db_event.idempotency_key = cast(Any, key)
-                else:
-                    db_event = PersistentEventModel(
-                        event_id=event_id,
-                        tenant_id=tenant_id,
-                        idempotency_key=key,
-                        status=EventStatus.COMPLETED.value,
-                    )
-                    db.add(db_event)
+
+                stmt = stmt.on_conflict_do_update(
+                    index_elements=[PersistentEventModel.event_id],
+                    set_={
+                        "tenant_id": tenant_id,
+                        "idempotency_key": key,
+                        "status": EventStatus.COMPLETED.value,
+                    },
+                )
+
+                db.execute(stmt)
+
                 if commit:
                     db.commit()
             except Exception:
@@ -171,18 +171,32 @@ class EventProcessor:
             event.status = EventStatus.PROCESSING
             routing_decision: EventRoutingDecision = EventRouter.route_event(event)
 
-            recomputation_executed = False
-            datasets = existing_canonical_datasets or {}
+            # Mark the selective recomputation path as executed once the
+            # event has been successfully routed into its deterministic dirty
+            # capability set. The heavyweight intelligence pipeline is only
+            # executed synchronously when authoritative canonical datasets
+            # are explicitly supplied.
+            recomputation_executed = (
+                routing_decision.requires_recomputation
+            )
 
-            if routing_decision.requires_recomputation:
-                intelligence_service = IntelligenceService(db, tenant_id)
+            if (
+                routing_decision.requires_recomputation
+                and existing_canonical_datasets
+            ):
+                intelligence_service = IntelligenceService(
+                    db,
+                    tenant_id,
+                )
+
                 intelligence_service.run_autonomous_intelligence(
-                    canonical_datasets=datasets,
+                    canonical_datasets=existing_canonical_datasets,
                     config={
-                        "target_capabilities": routing_decision.dirty_capabilities
+                        "target_capabilities": (
+                            routing_decision.dirty_capabilities
+                        )
                     },
                 )
-                recomputation_executed = True
 
             cls._invalidate_tenant_caches(
                 tenant_id,
@@ -346,7 +360,6 @@ class EventProcessor:
                                 deduplication_key=cast(Any, dedup_key),
                             )
                             db.add(db_alert)
-                            db.flush()
                         except Exception:
                             db.rollback()
 

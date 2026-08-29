@@ -1,4 +1,4 @@
-"""Page-level context builder, fact-pack compiler, and anti-hallucination grounding validator for Phase 9."""
+﻿"""Page-level context builder, fact-pack compiler, and anti-hallucination grounding validator for Phase 9."""
 
 import math
 import re
@@ -119,7 +119,7 @@ class ContextBuilder:
 
         # 2. Extract Portfolio KPIs from Snapshot
         if snapshot and not target_entity:
-            port_freshness = freshness_map.get("PORTFOLIO", "LIVE")
+            port_freshness = freshness_map.get("PORTFOLIO", "UNKNOWN")
             facts.append(
                 FactItem(
                     domain="PORTFOLIO",
