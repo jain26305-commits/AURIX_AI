@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from sqlalchemy import text as sqlalchemy_text
 from sqlalchemy.orm import Session
 import pandas as pd
 
@@ -55,6 +56,24 @@ class OnboardingService:
     """
 
     @staticmethod
+    def _bind_tenant_to_session(
+        db: Session,
+        tenant_id: str,
+    ) -> None:
+        """Bind the explicit onboarding tenant to the current PostgreSQL transaction."""
+        clean_tenant_id = str(tenant_id).strip()
+
+        if not clean_tenant_id:
+            raise ValueError("tenant_id cannot be empty")
+
+        db.execute(
+            sqlalchemy_text(
+                "SELECT set_config('app.tenant_id', :tenant_id, true)"
+            ),
+            {"tenant_id": clean_tenant_id},
+        )
+
+    @staticmethod
     def _compute_input_hash(content: bytes) -> str:
         """Computes deterministic SHA-256 digest of incoming raw content."""
         return hashlib.sha256(content).hexdigest()
@@ -76,6 +95,7 @@ class OnboardingService:
         Persist the parsed source dataset so onboarding can be resumed
         without requiring the browser to resend the original records.
         """
+        OnboardingService._bind_tenant_to_session(db, tenant_id)
         staged = (
             db.query(OnboardingDataset)
             .filter(
@@ -1364,6 +1384,7 @@ class OnboardingService:
         ] = None,
     ) -> OnboardingResult:
         """Resumes an onboarding execution by applying client-provided column mapping overrides."""
+        OnboardingService._bind_tenant_to_session(db, tenant_id)
         run_id = request_data.run_id
 
         staged = (
