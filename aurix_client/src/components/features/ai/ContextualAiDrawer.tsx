@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { AiQueryResponse } from '@/types/ai-query.types';
@@ -23,6 +23,7 @@ export interface ContextualAiDrawerProps {
   onSubmitQuery: (customText?: string) => void;
   queryHistory: AiQueryResponse[];
   isLoading: boolean;
+  error?: { code: string; message: string; statusCode?: number } | null;
   workspaceTitle: string;
   activeInsight?: BusinessInsight;
   provenance?: ProvenanceMetadata;
@@ -36,6 +37,7 @@ export const ContextualAiDrawer: React.FC<ContextualAiDrawerProps> = ({
   onSubmitQuery,
   queryHistory,
   isLoading,
+  error,
   workspaceTitle,
   activeInsight,
   provenance,
@@ -226,6 +228,37 @@ export const ContextualAiDrawer: React.FC<ContextualAiDrawerProps> = ({
         </div>
 
         <div className="pt-3 border-t border-white/10 shrink-0">
+          {error && (
+            <div
+              role="alert"
+              className="rounded-xl border border-red-400/30 bg-red-500/[0.08] p-3 text-xs text-red-200"
+            >
+              <div className="font-bold uppercase tracking-wider text-[10px] mb-1">
+                AURIX AI REQUEST FAILED
+              </div>
+              <div className="font-sans leading-relaxed">
+                {error.message}
+              </div>
+              <button
+                type="button"
+                onClick={() => onSubmitQuery()}
+                disabled={isLoading || !queryText.trim()}
+                className="mt-2 px-3 py-1.5 rounded-lg border border-red-300/30 bg-red-400/10 hover:bg-red-400/20 disabled:opacity-40 text-[10px] font-bold uppercase tracking-wider cursor-pointer disabled:cursor-not-allowed"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {isLoading && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-xl border border-[#D4AF37]/20 bg-[#D4AF37]/[0.05] px-3 py-2 text-[10px] text-[#D4AF37] font-bold uppercase tracking-wider"
+            >
+              AURIX AI is analyzing your enterprise context...
+            </div>
+          )}
           <form
             onSubmit={(event) => {
               event.preventDefault();

@@ -93,3 +93,4 @@ STEP*_MASTER.ps1
 STEP*.ps1
 STEP*.txt
 AURIX_STEP*.txt
+.aurix_one_pass_*/

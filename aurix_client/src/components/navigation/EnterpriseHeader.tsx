@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { GlobalSearch } from '@/components/search/GlobalSearch';
@@ -110,7 +110,7 @@ export const EnterpriseHeader: React.FC<EnterpriseHeaderProps> = ({
             onClick={onOpenAi}
             aria-label="Open AURIX AI"
             title="Open AURIX AI"
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-mono font-bold transition border border-[#D4AF37]/30 bg-[#D4AF37]/[0.08] hover:bg-[#D4AF37]/[0.16] hover:border-[#D4AF37]/60 text-[#D4AF37] cursor-pointer shadow-[0_0_14px_rgba(212,175,55,0.08)]"
+            className="group relative flex items-center justify-center gap-3 px-7 py-3.5 min-h-[3.5rem] rounded-xl text-sm md:text-base uppercase tracking-[0.16em] font-mono font-extrabold transition-all duration-300 border border-[#F0D878]/80 bg-gradient-to-r from-[#D4AF37] via-[#F0D878] to-[#D4AF37] text-black cursor-pointer shadow-[0_0_28px_rgba(212,175,55,0.38)] hover:scale-[1.035] focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/70 shrink-0"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>AURIX AI</span>

@@ -1,10 +1,15 @@
-﻿'use client';
+'use client';
 
 import { useState, useCallback } from 'react';
 import {
   AiQueryResponse,
 } from '@/types/ai-query.types';
 import { AiQueryService } from '@/services/api/aiQueryService';
+export interface AiQueryUiError {
+  code: string;
+  message: string;
+  statusCode?: number;
+}
 
 export function useContextualAi(
   workspaceContext: string = 'Control Tower',
@@ -13,6 +18,7 @@ export function useContextualAi(
   const [queryText, setQueryText] = useState('');
   const [queryHistory, setQueryHistory] = useState<AiQueryResponse[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<AiQueryUiError | null>(null);
 
   const submitQuery = useCallback(
     async (customText?: string) => {
@@ -22,6 +28,7 @@ export function useContextualAi(
         return;
       }
 
+      setError(null);
       setIsLoading(true);
 
       try {
@@ -34,10 +41,34 @@ export function useContextualAi(
 
         setQueryHistory((prev) => [response, ...prev]);
         setQueryText('');
-      } catch (error) {
+      } catch (caught: unknown) {
+        const candidate = caught as {
+          message?: string;
+          code?: string;
+          statusCode?: number;
+        };
+
+        const message =
+          typeof candidate?.message === 'string' &&
+          candidate.message.trim()
+            ? candidate.message
+            : 'AURIX AI could not complete this request. Please try again.';
+
+        setError({
+          code:
+            typeof candidate?.code === 'string' && candidate.code
+              ? candidate.code
+              : 'AI_QUERY_FAILED',
+          message,
+          statusCode:
+            typeof candidate?.statusCode === 'number'
+              ? candidate.statusCode
+              : undefined,
+        });
+
         console.error(
           '[useContextualAi] Query execution failed:',
-          error,
+          caught,
         );
       } finally {
         setIsLoading(false);
@@ -53,6 +84,8 @@ export function useContextualAi(
     setQueryText,
     queryHistory,
     isLoading,
+    error,
     submitQuery,
+    clearError: () => setError(null),
   };
 }

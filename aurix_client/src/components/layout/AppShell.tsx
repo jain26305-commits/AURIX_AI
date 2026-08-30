@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { EnterpriseSidebar } from '@/components/navigation/EnterpriseSidebar';
@@ -94,7 +94,8 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         onSubmitQuery={ai.submitQuery}
         queryHistory={ai.queryHistory}
         isLoading={ai.isLoading}
-        workspaceTitle={
+        error={ai.error}
+workspaceTitle={
           header.activeWorkspaceTitle ||
           header.subdomainTitle ||
           header.domainTitle ||

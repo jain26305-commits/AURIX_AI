@@ -218,7 +218,14 @@ class Phase3Orchestrator:
                         filename=f"{sku}__champion.joblib",
                         data=model_buffer.getvalue(),
                     )
-                    model_path = model_reference
+
+                    # Keep a local filesystem copy for synchronous consumers
+                    # and compatibility tests. Supabase remains the durable
+                    # source of truth through model_reference.
+                    model_bytes = model_buffer.getvalue()
+
+                    with open(model_path, "wb") as model_file:
+                        model_file.write(model_bytes)
                 model_params = champion_obj.get_params()
             else:
                 model_params = {}
@@ -254,7 +261,14 @@ class Phase3Orchestrator:
                     data=metadata_bytes,
                     content_type="application/json",
                 )
-                metadata_path = metadata_reference
+
+                # Keep a local metadata materialization for synchronous consumers
+                # and compatibility with callers that expect provenance["metadata_path"]
+                # to be a real filesystem path. Supabase remains the durable source
+                # of truth through metadata_reference.
+                with open(metadata_path, "wb") as metadata_file:
+                    metadata_file.write(metadata_bytes)
+
 
             phase4_contract = Phase4InputContract(
                 entity_id=sku,
