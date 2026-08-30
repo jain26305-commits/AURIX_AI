@@ -1,7 +1,6 @@
+﻿# ============================================================
+# AURIX Enterprise Platform â€” Git Ignore Specification
 # ============================================================
-# AURIX Enterprise Platform — Git Ignore Specification
-# ============================================================
-
 # 1. Byte-compiled / Optimized / Python Artifacts
 __pycache__/
 *.py[cod]
@@ -22,7 +21,6 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-
 # 2. Testing, Coverage & Static Analysis Caches
 .pytest_cache/
 .mypy_cache/
@@ -35,7 +33,6 @@ nosetests.xml
 coverage.xml
 *.cover
 *.py,cover
-
 # 3. Virtual Environments & Local Configuration
 .env
 .env.*
@@ -46,13 +43,11 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
 # 4. Local SQLite Databases & Volatile Runtime Stores
 *.db
 *.sqlite
 *.sqlite3
 aurix_enterprise.db
-
 # 5. IDE, Editor & OS Specific Files
 .vscode/
 .idea/
@@ -66,13 +61,11 @@ aurix_enterprise.db
 .Trashes
 ehthumbs.db
 Thumbs.db
-
 # 6. Logs & Debug Transients
 *.log
 logs/
 artifacts/models/*
 !artifacts/models/.gitkeep
-
 # ============================================================
 # Node / Next.js
 # ============================================================
@@ -85,7 +78,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-
 # ============================================================
 # AURIX generated release/audit artifacts
 # ============================================================
@@ -94,7 +86,10 @@ AURIX_STEP*/
 AURIX_*_AUDIT.txt
 AURIX_RELEASE_MANIFEST.json
 AURIX_COMPOSE_RESOLVED.yml
-
 STEP*_MASTER_BEFORE_*.ps1
 STEP*_MASTER_DAMAGED_*.ps1
-
+.venv/
+STEP*_MASTER.ps1
+STEP*.ps1
+STEP*.txt
+AURIX_STEP*.txt
