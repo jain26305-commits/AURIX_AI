@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { DomainWorkspaceOrchestrator } from '@/components/domain/DomainWorkspaceOrchestrator';
@@ -10,6 +10,7 @@ import { ReorderPointAlert } from '@/components/features/inventory/ReorderPointA
 import { StockoutRiskMatrix } from '@/components/features/inventory/StockoutRiskMatrix';
 import { AurixCard } from '@/components/ui/AurixCard';
 import { AurixBadge } from '@/components/ui/AurixBadge';
+import { SkuSelector } from '@/components/navigation/SkuSelector';
 
 function InventoryWorkspace({ subdomainId }: { subdomainId: string }) {
   const {
@@ -75,6 +76,10 @@ function InventoryWorkspace({ subdomainId }: { subdomainId: string }) {
 
   return (
     <div className="space-y-6">
+      <div className="flex justify-end">
+        <SkuSelector />
+      </div>
+
       {subdomainId === 'health' && (
         <div className="space-y-6">
           <StockHealthMatrix skuInventories={data.skuInventories} />

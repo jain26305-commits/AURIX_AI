@@ -16,6 +16,7 @@ import { BacktestPerformanceTable } from '@/components/features/forecasting/Back
 import { ModelTransparencyDrawer } from '@/components/features/forecasting/ModelTransparencyDrawer';
 import { NetworkTopologyGraph } from '@/components/features/network/NetworkTopologyGraph';
 import { BullwhipAmplificationCard } from '@/components/features/network/BullwhipAmplificationCard';
+import { SkuSelector } from '@/components/navigation/SkuSelector';
 
 export default function SupplyChainPage() {
   const {
@@ -26,7 +27,7 @@ export default function SupplyChainPage() {
     isDrawerOpen,
     setIsDrawerOpen,
     reload: reloadForecast,
-  } = useForecastEngine('SKU-001');
+  } = useForecastEngine();
 
   const {
     data: networkData,
@@ -64,7 +65,10 @@ export default function SupplyChainPage() {
                       </p>
                     </div>
 
+                    <SkuSelector />
+
                     <ForecastHorizonSelector
+
                       selectedHorizon={horizon}
                       onSelectHorizon={setHorizon}
                     />
@@ -125,7 +129,7 @@ export default function SupplyChainPage() {
               <div className="space-y-4 pt-2 font-mono text-xs">
                 <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.05] flex items-center justify-between">
                   <div>
-                    <span className="text-white font-bold block">PO-2026-9812 • Yarn 100% Cotton 30s</span>
+                    <span className="text-white font-bold block">PO-2026-9812 â€¢ Yarn 100% Cotton 30s</span>
                     <span className="text-[10px] text-slate-500">Reorder Point: 1,200 kg | Order Qty: 4,000 kg</span>
                   </div>
                   <AurixButton variant="gold" size="sm">APPROVE DISPATCH</AurixButton>

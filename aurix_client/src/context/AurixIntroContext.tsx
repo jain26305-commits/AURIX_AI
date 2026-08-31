@@ -1,34 +1,41 @@
-﻿'use client';
+'use client';
 
 import React, {
   createContext,
   useCallback,
   useContext,
   useRef,
+  useState,
   useSyncExternalStore,
+  type RefObject,
 } from 'react';
 
+export const INTRO_TIMELINE = {
+  logoRevealDelay: 400,
+  intelligenceDelay: 700,
+  taglineDelay: 900,
+  glassSweepDelay: 1200,
+  glassSweepDuration: 1200,
+  holdEnd: 3000,
+  flightDuration: 1500,
+  totalDuration: 4500,
+  firstAudioOffset: 200,
+} as const;
+
 export type IntroPhase =
-  | 'idle'
   | 'playing'
   | 'flying'
   | 'complete';
 
-export const INTRO_TIMELINE = {
-  intelligenceDelay: 600,
-  taglineDelay: 1000,
-  holdEnd: 1800,
-  flightDuration: 650,
-};
-
-interface AurixIntroContextType {
+interface AurixIntroContextValue {
   phase: IntroPhase;
   setPhase: (phase: IntroPhase) => void;
-  headerLogoRef: React.RefObject<HTMLDivElement | null>;
+  navLogoRef: RefObject<HTMLAnchorElement | null>;
   skipIntro: () => void;
 }
 
-const STORAGE_KEY = 'aurix_session_intro_completed';
+const STORAGE_KEY =
+  'aurix_session_intro_completed';
 
 function subscribeIntro(
   callback: () => void
@@ -37,7 +44,9 @@ function subscribeIntro(
     return () => {};
   }
 
-  const handleStorage = (event: StorageEvent) => {
+  const handleStorage = (
+    event: StorageEvent
+  ) => {
     if (event.key === STORAGE_KEY) {
       callback();
     }
@@ -57,11 +66,13 @@ function subscribeIntro(
 
 function getIntroSnapshot(): IntroPhase {
   if (typeof window === 'undefined') {
-    return 'idle';
+    return 'playing';
   }
 
   try {
-    return sessionStorage.getItem(STORAGE_KEY)
+    return sessionStorage.getItem(
+      STORAGE_KEY
+    )
       ? 'complete'
       : 'playing';
   } catch {
@@ -69,18 +80,20 @@ function getIntroSnapshot(): IntroPhase {
   }
 }
 
-function getIntroServerSnapshot(): IntroPhase {
-  return 'idle';
+function getIntroServerSnapshot():
+  IntroPhase {
+  return 'playing';
 }
 
 const AurixIntroContext =
   createContext<
-    AurixIntroContextType | undefined
-  >(undefined);
+    AurixIntroContextValue | null
+  >(null);
 
 export const AurixIntroProvider: React.FC<{
   children: React.ReactNode;
 }> = ({ children }) => {
+
   const storagePhase =
     useSyncExternalStore(
       subscribeIntro,
@@ -88,13 +101,25 @@ export const AurixIntroProvider: React.FC<{
       getIntroServerSnapshot
     );
 
-  const headerLogoRef =
-    useRef<HTMLDivElement>(null);
+  const [
+    phaseOverride,
+    setPhaseOverride
+  ] =
+    useState<IntroPhase | null>(null);
+
+  const navLogoRef =
+    useRef<HTMLAnchorElement>(null);
+
+  const phase =
+    phaseOverride ?? storagePhase;
 
   const setPhase = useCallback(
-    (newPhase: IntroPhase) => {
+    (nextPhase: IntroPhase) => {
+
+      setPhaseOverride(nextPhase);
+
       if (
-        newPhase === 'complete' &&
+        nextPhase === 'complete' &&
         typeof window !== 'undefined'
       ) {
         try {
@@ -103,25 +128,24 @@ export const AurixIntroProvider: React.FC<{
             'true'
           );
         } catch {
-          // Storage may be unavailable.
+          // In-memory override still completes the intro.
         }
       }
     },
     []
   );
 
-  const phase: IntroPhase = storagePhase;
-
-  const skipIntro = useCallback(() => {
-    setPhase('complete');
-  }, [setPhase]);
+  const skipIntro = useCallback(
+    () => setPhase('complete'),
+    [setPhase]
+  );
 
   return (
     <AurixIntroContext.Provider
       value={{
         phase,
         setPhase,
-        headerLogoRef,
+        navLogoRef,
         skipIntro,
       }}
     >
@@ -131,12 +155,13 @@ export const AurixIntroProvider: React.FC<{
 };
 
 export const useAurixIntro = () => {
+
   const context =
     useContext(AurixIntroContext);
 
   if (!context) {
     throw new Error(
-      'useAurixIntro must be used within an AurixIntroProvider'
+      'useAurixIntro must be used within an <AurixIntroProvider>.'
     );
   }
 

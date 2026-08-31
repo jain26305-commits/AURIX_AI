@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { DataBoundary } from '@/components/states/DataBoundary';
@@ -10,6 +10,7 @@ import { IntermittencyClassificationCard } from '@/components/features/forecasti
 import { BacktestPerformanceTable } from '@/components/features/forecasting/BacktestPerformanceTable';
 import { ModelTransparencyDrawer } from '@/components/features/forecasting/ModelTransparencyDrawer';
 import { AurixBadge } from '@/components/ui/AurixBadge';
+import { SkuSelector } from '@/components/navigation/SkuSelector';
 
 export default function ForecastingIntelligencePage() {
   const {
@@ -20,10 +21,13 @@ export default function ForecastingIntelligencePage() {
     isDrawerOpen,
     setIsDrawerOpen,
     reload: reloadForecast,
-  } = useForecastEngine('SKU-001');
+  } = useForecastEngine();
 
   return (
     <div className="space-y-6 animate-pure-fade">
+      <div className="flex justify-end">
+        <SkuSelector />
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl aurix-card-glass border border-white/[0.08]">
         <div>
           <div className="flex items-center gap-2">

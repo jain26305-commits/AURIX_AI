@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { ApiClient } from '@/services/api/apiClient';
 import { DOMAIN_REGISTRY } from '@/config/domainRegistry';
+import { useAurixIntro } from '@/context/AurixIntroContext';
 import {
   LayoutDashboard, Target, TestTube, Bot,
   Truck, Boxes, Factory, ShoppingCart, Share2,
@@ -73,6 +74,7 @@ export const EnterpriseSidebar: React.FC<{
   const router = useRouter();
   const [flyoutHref, setFlyoutHref] = useState<string | null>(null);
   const [flyoutRect, setFlyoutRect] = useState<{ top: number; left: number } | null>(null);
+  const { phase, navLogoRef } = useAurixIntro();
 
 
   // Build a route -> subdomain list lookup so the sidebar can surface
@@ -102,6 +104,12 @@ export const EnterpriseSidebar: React.FC<{
         <Link
           href="/"
           prefetch={true}
+          ref={navLogoRef}
+          style={{
+            opacity: phase === 'complete' ? 1 : 0,
+            transition: 'opacity 180ms ease',
+          }}
+          aria-hidden={phase !== 'complete'}
           onClick={() => handleNavClick(pathname === '/')}
           className="flex items-center gap-3 group"
         >
@@ -236,7 +244,7 @@ export const EnterpriseSidebar: React.FC<{
                       >
                         <div className="px-2.5 py-1.5 mb-1 border-b border-white/[0.06]">
                           <span className="text-[9px] font-bold text-[#D4AF37] uppercase tracking-widest">
-                            {domain.title} â€” Subdomains
+                            {domain.title} Ã¢â‚¬â€ Subdomains
                           </span>
                         </div>
                         {domain.subdomains.map((sub) => {

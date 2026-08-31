@@ -1,4 +1,4 @@
-﻿import { ApiError, ApiErrorDetails, ApiMode } from '@/types/api.types';
+import { ApiError, ApiErrorDetails, ApiMode } from '@/types/api.types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_AURIX_API_URL || 'http://localhost:8000/api/v1';
 
@@ -56,15 +56,49 @@ export class ApiClient {
   }
 
   public static getAuthToken(): string | null {
-    if (typeof window !== 'undefined') {
-      return (
-        localStorage.getItem('aurix_session_token') ||
-        localStorage.getItem('aurix_auth_token')
-      );
+    if (typeof window === 'undefined') {
+      return null;
     }
-    return null;
-  }
 
+    try {
+      const rawSession = sessionStorage.getItem('aurix_user_session');
+
+      if (rawSession) {
+        const session = JSON.parse(rawSession) as {
+          token?: unknown;
+          expiresAt?: unknown;
+        };
+
+        const sessionToken =
+          typeof session.token === 'string'
+            ? session.token.trim()
+            : '';
+
+        const expiresAt =
+          typeof session.expiresAt === 'string'
+            ? new Date(session.expiresAt).getTime()
+            : NaN;
+
+        if (
+          sessionToken &&
+          Number.isFinite(expiresAt) &&
+          expiresAt > Date.now()
+        ) {
+          return sessionToken;
+        }
+      }
+    } catch {
+      // Fall back to the existing token stores.
+    }
+
+    const localToken =
+      localStorage.getItem('aurix_session_token') ||
+      localStorage.getItem('aurix_auth_token');
+
+    return localToken && localToken.trim()
+      ? localToken.trim()
+      : null;
+  }
   public static setAuthToken(token: string | null): void {
     if (typeof window !== 'undefined') {
       if (token) {
@@ -249,4 +283,3 @@ export class ApiClient {
     }
   }
 }
-

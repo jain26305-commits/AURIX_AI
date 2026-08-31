@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -8,22 +8,35 @@ import {
 } from '@/types/inventory.types';
 import { InventoryService } from '@/services/api/inventoryService';
 import { useDebounce } from '@/hooks/useDebounce';
+import {
+  useSkuWorkspaceContext,
+} from '@/context/SkuWorkspaceContext';
 
-const INVENTORY_QUERY_KEY = ['inventory', 'analytics'] as const;
+const INVENTORY_QUERY_KEY =
+  ['inventory', 'analytics'] as const;
 
 export function useInventoryOptimization() {
-  const [selectedSkuId, setSelectedSkuId] = useState<string>('');
-  const [simulatedServiceLevel, setSimulatedServiceLevel] =
-    useState<number>(95);
+  const {
+    selectedSkuId,
+    setSelectedSkuId,
+  } = useSkuWorkspaceContext();
 
-  const inventoryQuery = useQuery<InventoryAnalyticsReport>({
-    queryKey: INVENTORY_QUERY_KEY,
-    queryFn: InventoryService.fetchInventoryAnalytics,
-    staleTime: 60_000,
-    refetchOnWindowFocus: false,
-  });
+  const [
+    simulatedServiceLevel,
+    setSimulatedServiceLevel,
+  ] = useState<number>(95);
 
-  const data = inventoryQuery.data ?? null;
+  const inventoryQuery =
+    useQuery<InventoryAnalyticsReport>({
+      queryKey: INVENTORY_QUERY_KEY,
+      queryFn:
+        InventoryService.fetchInventoryAnalytics,
+      staleTime: 60_000,
+      refetchOnWindowFocus: false,
+    });
+
+  const data =
+    inventoryQuery.data ?? null;
 
   const authoritativeSkuId =
     selectedSkuId ||
@@ -31,30 +44,40 @@ export function useInventoryOptimization() {
     '';
 
   const debouncedServiceLevel =
-    useDebounce(simulatedServiceLevel, 300);
+    useDebounce(
+      simulatedServiceLevel,
+      300
+    );
 
-  const policyQuery = useQuery<InventoryPolicyRecalculateResponse>({
-    queryKey: [
-      'inventory',
-      'policy-recalculation',
-      authoritativeSkuId,
-      debouncedServiceLevel,
-    ],
-    queryFn: () =>
-      InventoryService.recalculatePolicy({
-        skuId: authoritativeSkuId,
-        serviceLevelTargetPercent: debouncedServiceLevel,
-      }),
-    enabled:
-      Boolean(authoritativeSkuId) &&
-      Boolean(data?.skuInventories?.length),
-    staleTime: 0,
-    refetchOnWindowFocus: false,
-  });
+  const policyQuery =
+    useQuery<InventoryPolicyRecalculateResponse>({
+      queryKey: [
+        'inventory',
+        'policy-recalculation',
+        authoritativeSkuId,
+        debouncedServiceLevel,
+      ],
+      queryFn: () =>
+        InventoryService.recalculatePolicy({
+          skuId:
+            authoritativeSkuId,
+          serviceLevelTargetPercent:
+            debouncedServiceLevel,
+        }),
+      enabled:
+        Boolean(authoritativeSkuId) &&
+        Boolean(
+          data?.skuInventories?.length
+        ),
+      staleTime: 0,
+      refetchOnWindowFocus: false,
+    });
 
   const activeSku =
     data?.skuInventories.find(
-      (sku) => sku.skuId === authoritativeSkuId
+      (sku) =>
+        sku.skuId ===
+        authoritativeSkuId
     ) ??
     data?.skuInventories[0];
 
@@ -69,7 +92,8 @@ export function useInventoryOptimization() {
     isRecalculating:
       policyQuery.isLoading ||
       policyQuery.isFetching,
-    selectedSkuId: authoritativeSkuId,
+    selectedSkuId:
+      authoritativeSkuId,
     setSelectedSkuId,
     activeSku,
     simulatedServiceLevel,

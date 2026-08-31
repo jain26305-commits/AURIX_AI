@@ -5,7 +5,10 @@ import { QueryProvider } from '@/providers/QueryProvider';
 import { TenantProvider } from '@/context/TenantContext';
 import { SidebarProvider } from '@/context/SidebarContext';
 import { WorkspaceHeaderProvider } from '@/context/WorkspaceHeaderContext';
+import { SkuWorkspaceProvider } from '@/context/SkuWorkspaceContext';
 import { AppShell } from '@/components/layout/AppShell';
+import { AurixIntroProvider } from '@/context/AurixIntroContext';
+import { AurixClientIntro } from '@/components/intro/AurixClientIntro';
 
 const inter = Inter({
   subsets: ['latin'],
@@ -81,15 +84,28 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/icon.svg" type="image/svg+xml" />
       </head>
       <body className="bg-[#030303] text-[#F9FAFB] min-h-screen overflow-x-hidden selection:bg-[#D4AF37]/30 selection:text-white">
-        <QueryProvider>
-          <TenantProvider>
-            <SidebarProvider>
-              <WorkspaceHeaderProvider>
-                <AppShell>{children}</AppShell>
-              </WorkspaceHeaderProvider>
-            </SidebarProvider>
-          </TenantProvider>
-        </QueryProvider>
+        <AurixIntroProvider>
+  <AurixClientIntro />
+  <SkuWorkspaceProvider>
+    <QueryProvider>
+
+            <TenantProvider>
+
+              <SidebarProvider>
+
+                <WorkspaceHeaderProvider>
+
+                  <AppShell>{children}</AppShell>
+
+                </WorkspaceHeaderProvider>
+
+              </SidebarProvider>
+
+            </TenantProvider>
+
+    </QueryProvider>
+  </SkuWorkspaceProvider>
+</AurixIntroProvider>
       </body>
     </html>
   );

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { DataBoundary } from '@/components/states/DataBoundary';
@@ -6,14 +6,18 @@ import { useForecastEngine } from '@/hooks/useForecastEngine';
 import { IntermittencyClassificationCard } from '@/components/features/forecasting/IntermittencyClassificationCard';
 import { AurixCard } from '@/components/ui/AurixCard';
 import { AurixBadge } from '@/components/ui/AurixBadge';
+import { SkuSelector } from '@/components/navigation/SkuSelector';
 
 export default function DemandIntelligencePage() {
-  const { data: forecastData, loading, reload } = useForecastEngine('SKU-001');
+  const { data: forecastData, loading, reload } = useForecastEngine();
 
   const championModel = forecastData?.metadata.competingModels.find((m) => m.isChampion);
 
   return (
     <div className="space-y-6 animate-pure-fade">
+      <div className="flex justify-end">
+        <SkuSelector />
+      </div>
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl aurix-card-glass border border-white/[0.08]">
         <div>
           <div className="flex items-center gap-2">

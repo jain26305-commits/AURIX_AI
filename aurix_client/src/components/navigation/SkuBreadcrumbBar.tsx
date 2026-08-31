@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ChevronRight, ArrowLeft, Layers } from 'lucide-react';
 import { AurixBadge } from '@/components/ui/AurixBadge';
+import { useSkuWorkspaceContext } from '@/context/SkuWorkspaceContext';
 
 export interface SkuOption {
   id: string;
@@ -37,10 +38,12 @@ export const SkuBreadcrumbBar: React.FC<SkuBreadcrumbBarProps> = ({
   availableSkus = DEFAULT_SKU_CATALOG,
 }) => {
   const router = useRouter();
+  const { setSelectedSkuId } = useSkuWorkspaceContext();
 
   const handleSkuChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextSkuId = e.target.value;
     if (nextSkuId && nextSkuId !== skuId) {
+      setSelectedSkuId(nextSkuId);
       router.push(`/workspace/sku/${nextSkuId}`);
     }
   };
@@ -109,7 +112,7 @@ export const SkuBreadcrumbBar: React.FC<SkuBreadcrumbBarProps> = ({
         >
           {availableSkus.map((item) => (
             <option key={item.id} value={item.id} className="bg-[#0C0E12] text-slate-200">
-              {item.id} — {item.name}
+              {item.id} Ã¢â‚¬â€ {item.name}
             </option>
           ))}
         </select>

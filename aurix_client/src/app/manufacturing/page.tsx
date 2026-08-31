@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import { DomainWorkspaceOrchestrator } from '@/components/domain/DomainWorkspaceOrchestrator';
@@ -10,6 +10,7 @@ import { MrpScheduleTable } from '@/components/features/manufacturing/MrpSchedul
 import { WorkCenterCapacityCard } from '@/components/features/manufacturing/WorkCenterCapacityCard';
 import { AurixCard } from '@/components/ui/AurixCard';
 import { AurixBadge } from '@/components/ui/AurixBadge';
+import { SkuSelector } from '@/components/navigation/SkuSelector';
 
 
 function ManufacturingWorkspace({ subdomainId }: { subdomainId: string }) {
@@ -30,6 +31,10 @@ function ManufacturingWorkspace({ subdomainId }: { subdomainId: string }) {
   return (
     <div className="space-y-6">
       <ManufacturingStatsBar summary={data.summary} />
+
+      <div className="flex justify-end">
+        <SkuSelector />
+      </div>
 
       {/* OVERVIEW / EXECUTIVE PULSE */}
       {subdomainId === 'overview' && (
@@ -172,4 +177,3 @@ export default function ManufacturingPage() {
     />
   );
 }
-
